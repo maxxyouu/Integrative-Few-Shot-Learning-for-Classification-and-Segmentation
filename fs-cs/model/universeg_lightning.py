@@ -32,15 +32,29 @@ def get_nonlinearity(nonlinearity: Optional[str]) -> nn.Module:
 #@dataclass(eq=False, repr=False)
 class ConvOp(nn.Sequential):
 
-    in_channels: int
-    out_channels: int
-    kernel_size: size2t = 3
-    nonlinearity: Optional[str] = "LeakyReLU"
-    init_distribution: Optional[str] = "kaiming_normal"
-    init_bias: Union[None, float, int] = 0.0
+    # in_channels: int
+    # out_channels: int
+    # kernel_size: size2t = 3
+    # nonlinearity: Optional[str] = "LeakyReLU"
+    # init_distribution: Optional[str] = "kaiming_normal"
+    # init_bias: Union[None, float, int] = 0.0
 
-    def __post_init__(self):
+    def __init__(self, 
+                in_channels: size2t, 
+                out_channels: int, 
+                kernel_size: size2t = 3, 
+                nonlinearity: Optional[str] = "LeakyReLU", 
+                init_distribution: Optional[str] = "kaiming_normal", 
+                init_bias: Union[None, float, int] = 0.0):
         super().__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.nonlinearity = nonlinearity
+        self.init_distribution = init_distribution
+        self.init_bias = init_bias
+
         self.conv = nn.Conv2d(
             self.in_channels,
             self.out_channels,
@@ -62,15 +76,22 @@ class ConvOp(nn.Sequential):
 #@dataclass(eq=False, repr=False)
 class CrossOp(nn.Module):
 
-    in_channels: size2t
-    out_channels: int
-    kernel_size: size2t = 3
-    nonlinearity: Optional[str] = "LeakyReLU"
-    init_distribution: Optional[str] = "kaiming_normal"
-    init_bias: Union[None, float, int] = 0.0
+    # in_channels: size2t
+    # out_channels: int
+    # kernel_size: size2t = 3
+    # nonlinearity: Optional[str] = "LeakyReLU"
+    # init_distribution: Optional[str] = "kaiming_normal"
+    # init_bias: Union[None, float, int] = 0.0
 
-    def __post_init__(self):
+    def __init__(self, in_channels: size2t, out_channels: int, kernel_size: size2t = 3, nonlinearity: Optional[str] = "LeakyReLU", init_distribution: Optional[str] = "kaiming_normal", init_bias: Union[None, float, int] = 0.0):
         super().__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.nonlinearity = nonlinearity
+        self.init_distribution = init_distribution
+        self.init_bias = init_bias
 
         self.cross_conv = CrossConv2d(
             in_channels=as_2tuple(self.in_channels),
@@ -101,14 +122,16 @@ class CrossOp(nn.Module):
 #@dataclass(eq=False, repr=False)
 class CrossBlock(nn.Module):
 
-    in_channels: size2t
-    cross_features: int
-    conv_features: Optional[int] = None
-    cross_kws: Optional[Dict[str, Any]] = None
-    conv_kws: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+
+    def __init__(self, in_channels: size2t, cross_features: int, conv_features: Optional[int] = None, cross_kws: Optional[Dict[str, Any]] = None, conv_kws: Optional[Dict[str, Any]] = None):
         super().__init__()
+
+        self.in_channels = in_channels
+        self.cross_features = cross_features
+        self.conv_features = conv_features
+        self.cross_kws = cross_kws
+        self.conv_kws = conv_kws
 
         conv_features = self.conv_features or self.cross_features
         cross_kws = self.cross_kws or {}
@@ -125,16 +148,16 @@ class CrossBlock(nn.Module):
         return target, support
 
 #@validate_arguments_init
-# #@dataclass(eq=False, repr=False)
+# @dataclass(eq=False, repr=False)
 class UniverSeg(iFSLModule):
     """
     main universeg model that inherit the pytorch lightning module.
     """
-    encoder_blocks: List[size2t] = [64, 64, 64, 64]
-    decoder_blocks: Optional[List[size2t]] = None
     
-    def __post_init__(self, args):
+    def __init__(self, args):
         super(UniverSeg, self).__init__(args)
+        self.encoder_blocks: List[size2t] = [64, 64, 64, 64]
+        self.decoder_blocks: Optional[List[size2t]] = None
 
         self.downsample = nn.MaxPool2d(2, 2)
         self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
@@ -148,8 +171,11 @@ class UniverSeg(iFSLModule):
 
         block_kws = dict(cross_kws=dict(nonlinearity=None))
 
-        in_ch = (1, 2)
-        out_channels = 1
+        # in_ch = (1, 2) #NOTE: this is for 1d image slice
+        # out_channels = 1 #NOTE: for using sigmoid only
+
+        in_ch = (3, 4) #NOTE: this is for rgb images (input dimension of the query images, input dimension of support images + input dimention of the support mask)
+        out_channels = 2 #NOTE: for using logsoftmax + negative log likelihood
         out_activation = None
 
         # Encoder
@@ -178,11 +204,11 @@ class UniverSeg(iFSLModule):
         batch['support_masks'].shape : [bsz, way, shot, H, W]
         '''
         # copy the forward code from the original universeg implementation
-        support_images = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w')
-        support_labels = None if self.weak else rearrange(batch['support_masks'], 'b n s h w -> (b n) s 1 h w') # resulting shape = [b, shot, h, w]
+        support_images = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w') # resulting shape = [b, shot,c, h, w]
+        support_labels = None if self.weak else rearrange(batch['support_masks'], 'b n s h w -> (b n) s 1 h w') # resulting shape = [b, shot,c, h, w]
         target_image = batch['query_img'] #[b, c, h, w]
 
-        target = rearrange(target_image, "B C H W -> B 1 C H W") # treat it as one shot
+        target = rearrange(target_image, "B C H W -> B 1 C H W") # #[b, 1, c, h, w]
         support = torch.cat([support_images, support_labels], dim=2)
 
         pass_through = []
@@ -206,6 +232,10 @@ class UniverSeg(iFSLModule):
         
         # should be for dimension of foreground and background
         shared_masks = torch.log_softmax(logits, dim=1)
+
+        # NOTE: for out_channels = 1: we have to use log sigmoid + bceCE and not log softmax + negative log likelihood 
+        # log_sigmoid = nn.LogSigmoid()
+        # shared_masks = log_sigmoid(logits)
         return shared_masks
 
     def train_mode(self):

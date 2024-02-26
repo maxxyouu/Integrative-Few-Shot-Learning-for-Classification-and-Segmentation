@@ -122,8 +122,8 @@ class CrossConv2d(nn.Conv2d):
             Tensor resulting from the cross-convolution between the elements of x and y.
             Has size (B, Sx, Sy, Co, H, W), where Co is the number of output channels.
         """
-        B, Sx, *_ = x.shape
-        _, Sy, *_ = y.shape
+        B, Sx, *_ = x.shape # b, shots = 1, c=3, h, w 
+        _, Sy, *_ = y.shape # b, shots >= 1, c=shots*2, h, w
 
         xs = E.repeat(x, "B Sx Cx H W -> B Sx Sy Cx H W", Sy=Sy)
         ys = E.repeat(y, "B Sy Cy H W -> B Sx Sy Cy H W", Sx=Sx)
