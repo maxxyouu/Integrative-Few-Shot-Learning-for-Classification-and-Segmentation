@@ -28,8 +28,8 @@ def get_nonlinearity(nonlinearity: Optional[str]) -> nn.Module:
     raise ValueError(f"nonlinearity {nonlinearity} not found")
 
 
-@validate_arguments_init
-@dataclass(eq=False, repr=False)
+#@validate_arguments_init
+#@dataclass(eq=False, repr=False)
 class ConvOp(nn.Sequential):
 
     in_channels: int
@@ -58,8 +58,8 @@ class ConvOp(nn.Sequential):
         )
 
 
-@validate_arguments_init
-@dataclass(eq=False, repr=False)
+#@validate_arguments_init
+#@dataclass(eq=False, repr=False)
 class CrossOp(nn.Module):
 
     in_channels: size2t
@@ -97,8 +97,8 @@ class CrossOp(nn.Module):
         return new_target, interaction
 
 
-@validate_arguments_init
-@dataclass(eq=False, repr=False)
+# #@validate_arguments_init
+#@dataclass(eq=False, repr=False)
 class CrossBlock(nn.Module):
 
     in_channels: size2t
@@ -124,13 +124,13 @@ class CrossBlock(nn.Module):
         support = self.support(support)
         return target, support
 
-@validate_arguments_init
-@dataclass(eq=False, repr=False)
+#@validate_arguments_init
+# #@dataclass(eq=False, repr=False)
 class UniverSeg(iFSLModule):
     """
     main universeg model that inherit the pytorch lightning module.
     """
-    encoder_blocks: List[size2t]
+    encoder_blocks: List[size2t] = [64, 64, 64, 64]
     decoder_blocks: Optional[List[size2t]] = None
     
     def __post_init__(self, args):
@@ -178,11 +178,11 @@ class UniverSeg(iFSLModule):
         batch['support_masks'].shape : [bsz, way, shot, H, W]
         '''
         # copy the forward code from the original universeg implementation
-        support_images = batch['support_imgs']
-        support_labels = None if self.weak else batch['support_masks']
-        target_image = batch['query_img']
+        support_images = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w')
+        support_labels = None if self.weak else rearrange(batch['support_masks'], 'b n s h w -> (b n) s 1 h w') # resulting shape = [b, shot, h, w]
+        target_image = batch['query_img'] #[b, c, h, w]
 
-        target = rearrange(target_image, "B C H W -> B 1 C H W")
+        target = rearrange(target_image, "B C H W -> B 1 C H W") # treat it as one shot
         support = torch.cat([support_images, support_labels], dim=2)
 
         pass_through = []
@@ -212,7 +212,7 @@ class UniverSeg(iFSLModule):
         self.train()
 
     def configure_optimizers(self):
-        return nn.optim.Adam([{"params": self.parameters(), "lr": self.args.lr}])
+        return torch.optim.Adam([{"params": self.parameters(), "lr": self.args.lr}])
 
     def predict_mask_nshot(self, batch, nshot):
         # Perform multiple prediction given (nshot) number of different support sets
