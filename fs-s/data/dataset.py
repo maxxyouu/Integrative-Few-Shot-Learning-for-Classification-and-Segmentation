@@ -30,21 +30,21 @@ class FSSDatasetModule(LightningDataModule):
 
     def train_dataloader(self):
         dataset = self.datasets[self.args.benchmark](self.datapath,
-                                                     fold=self.args.fold,
-                                                     transform=self.transform,
-                                                     split='trn',
-                                                     shot=1,  # shot=1 fixed for training
-                                                     use_original_imgsize=self.use_original_imgsize)
+                                                    fold=self.args.fold,
+                                                    transform=self.transform,
+                                                    split='trn',
+                                                    shot=self.args.shot,  # shot=1 #shot=1 fixed for training
+                                                    use_original_imgsize=self.use_original_imgsize)
         dataloader = DataLoader(dataset, batch_size=self.args.bsz, shuffle=True, num_workers=8)
         return dataloader
 
     def val_dataloader(self):
         dataset = self.datasets[self.args.benchmark](self.datapath,
-                                                     fold=self.args.fold,
-                                                     transform=self.transform,
-                                                     split='val',
-                                                     shot=self.args.shot,
-                                                     use_original_imgsize=self.use_original_imgsize)
+                                                    fold=self.args.fold,
+                                                    transform=self.transform,
+                                                    split='val',
+                                                    shot=self.args.shot,
+                                                    use_original_imgsize=self.use_original_imgsize)
         dataloader = DataLoader(dataset, batch_size=self.args.bsz, shuffle=False, num_workers=8)
         return dataloader
 

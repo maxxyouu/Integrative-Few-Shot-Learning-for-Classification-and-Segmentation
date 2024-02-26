@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch
 import PIL.Image as Image
 import numpy as np
+import os
 
 
 class DatasetPASCAL(Dataset):
@@ -185,7 +186,8 @@ class DatasetPASCAL(Dataset):
     def build_img_metadata(self):
 
         def read_metadata(split, fold_id):
-            fold_n_metadata = os.path.join(f'data/splits/pascal/{split}/fold{fold_id}.txt')
+            # fs-cs/data/splits/pascal/trn/fold0.txt (the relative path)
+            fold_n_metadata = os.path.join(f'fs-cs/data/splits/pascal/{split}/fold{fold_id}.txt')
             with open(fold_n_metadata, 'r') as f:
                 fold_n_metadata = f.read().split('\n')[:-1]
             fold_n_metadata = [[data.split('__')[0], int(data.split('__')[1])] for data in fold_n_metadata]

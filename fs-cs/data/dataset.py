@@ -33,7 +33,7 @@ class FSCSDatasetModule(LightningDataModule):
                                                      transform=self.transform,
                                                      split='trn',
                                                      way=self.args.way,
-                                                     shot=1)  # shot=1 fixed for training
+                                                     shot=self.args.shot)  #NOTE: for ifsi only shot=1 is supported shot=1 fixed for training
         dataloader = DataLoader(dataset, batch_size=self.args.bsz, shuffle=True, num_workers=8)
         return dataloader
 

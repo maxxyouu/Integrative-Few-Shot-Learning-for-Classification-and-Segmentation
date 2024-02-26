@@ -84,7 +84,7 @@ class DatasetCOCO(Dataset):
     def build_img_metadata_classwise(self):
         img_metadata_classwise = dict()
 
-        with open(f'./data/splits/coco/{self.split}/fold{self.fold}.pkl', 'rb') as f:
+        with open(f'fs-cs/data/splits/coco/{self.split}/fold{self.fold}.pkl', 'rb') as f:
             # class ids: 0, 1, 2, ..., 79
             img_metadata_classwise_temp = pickle.load(f)
 

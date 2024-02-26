@@ -2,7 +2,8 @@ import os
 
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.callbacks.progress import ProgressBar, reset, convert_inf
+from pytorch_lightning.callbacks.progress import ProgressBar
+
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
 from common.evaluation import AverageMeter
@@ -10,6 +11,47 @@ from common import utils
 
 from pprint import PrettyPrinter
 
+from typing import Optional, Union
+import math
+
+# if importlib.util.find_spec("ipywidgets") is not None:
+#     from tqdm.auto import tqdm as _tqdm
+# else:
+
+from tqdm import tqdm as _tqdm
+
+_PAD_SIZE = 5
+class tqdm(_tqdm):
+    """
+    Custom tqdm progressbar where we append 0 to floating points/strings to prevent the progress bar from flickering
+    """
+
+    @staticmethod
+    def format_num(n) -> str:
+        """Add additional padding to the formatted numbers"""
+        should_be_padded = isinstance(n, (float, str))
+        if not isinstance(n, str):
+            n = _tqdm.format_num(n)
+        if should_be_padded and "e" not in n:
+            if "." not in n and len(n) < _PAD_SIZE:
+                try:
+                    _ = float(n)
+                except ValueError:
+                    return n
+                n += "."
+            n += "0" * (_PAD_SIZE - len(n))
+        return n
+
+def convert_inf(x: Optional[Union[int, float]]) -> Optional[Union[int, float]]:
+    """The tqdm doesn't support inf/nan values. We have to convert it to None."""
+    if x is None or math.isinf(x) or math.isnan(x):
+        return None
+    return x
+
+def reset(bar: tqdm, total: Optional[int] = None) -> None:
+    """Resets the tqdm bar to 0 progress with a new total, unless it is disabled."""
+    if not bar.disable:
+        bar.reset(total=convert_inf(total))
 
 class CustomProgressBar(ProgressBar):
     """
@@ -21,6 +63,9 @@ class CustomProgressBar(ProgressBar):
         self.global_progress = global_progress
         self.leave_global_progress = leave_global_progress
         self.global_pb = None
+
+        self.main_progress_bar = tqdm()
+        self.val_progress_bar = tqdm()
 
     def on_train_epoch_start(self, trainer, pl_module):
         total_train_batches = self.total_train_batches
@@ -72,7 +117,7 @@ class MeterCallback(Callback):
     def on_train_epoch_start(self, trainer, pl_module):
         print(f'\n\n----- ep: {trainer.current_epoch:>3}-----')
         utils.fix_randseed(None)
-        dataset = trainer.train_dataloader.dataset.datasets
+        dataset = trainer.train_dataloader.dataset# .datasets
         pl_module.average_meter = AverageMeter(dataset, self.args.way)
         pl_module.train_mode()
 
