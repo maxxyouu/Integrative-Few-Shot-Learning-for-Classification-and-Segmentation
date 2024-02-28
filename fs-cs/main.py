@@ -11,6 +11,7 @@ from model.asnethm import AttentiveSqueezeNetworkHM
 from model.universeg_lightning import UniverSeg
 from data.dataset import FSCSDatasetModule
 from common.callbacks import MeterCallback, CustomProgressBar, CustomCheckpoint, OnlineLogger
+from pytorch_lightning.callbacks.progress import TQDMProgressBar
 
 
 def main(args):
@@ -30,7 +31,7 @@ def main(args):
     # Pytorch-lightning main trainer
     checkpoint_callback = CustomCheckpoint(args)
     trainer = Trainer(accelerator='cpu', #accelerator='dp',  # DataParallel TODO: run on different accelerator in the lab env
-                    callbacks=[MeterCallback(args), CustomCheckpoint(args), CustomProgressBar()],
+                    callbacks=[MeterCallback(args), CustomCheckpoint(args), TQDMProgressBar(refresh_rate=1)], #
                     # num_nodes=torch.cuda.device_count(), # gpus=torch.cuda.device_count(),
                     logger=False if args.nowandb or args.eval else OnlineLogger(args),
                     # progress_bar_refresh_rate=1,
