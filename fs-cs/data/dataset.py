@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from pytorch_lightning.core.datamodule import LightningDataModule
 
 from data.pascal import DatasetPASCAL
+# from data.pascal_origin import DatasetPASCAL
 from data.coco import DatasetCOCO
 
 

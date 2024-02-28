@@ -44,7 +44,7 @@ class iFSLModule(pl.LightningModule):
         # FYI: this support_names' shape is transposed so keep in mind for vis
         batch['support_names'].shape : [bsz, shot, way]
         batch['support_ignore_idxs'].shape: [bsz, way, shot, H, W]
-        batch['class_id'].shape : [bsz]
+        batch['support_classes'].shape : [bsz]
         batch['support_classes'].shape : [bsz, way] (torch.int64)
         batch['query_class_presence'].shape : [bsz, way] (torch.bool)
         # FYI: K-shot is always fixed to 1 for training

@@ -35,8 +35,11 @@ class DatasetPASCAL(Dataset):
         query_name, support_names, class_sample = self.sample_episode(idx)
         query_img, query_cmask, support_imgs, support_cmasks, org_qry_imsize = self.load_frame(query_name, support_names) # cmask stands for class mask
 
+        query_class_presence = [s_c in torch.unique(query_cmask) for s_c in [class_sample+1]]  # needed - 1
+
         query_img = self.transform(query_img)
-        if not self.use_original_imgsize:
+        # if not self.use_original_imgsize:
+        if self.split == 'trn':
             query_cmask = F.interpolate(query_cmask.unsqueeze(0).unsqueeze(0).float(), query_img.size()[-2:], mode='nearest').squeeze()
         query_mask, query_ignore_idx = self.extract_ignore_idx(query_cmask.float(), class_sample)
         
@@ -72,7 +75,8 @@ class DatasetPASCAL(Dataset):
                 'support_names': support_names,
                 'support_ignore_idxs': support_ignore_idxs,
 
-                'class_id': torch.tensor(class_sample)}
+                'support_classes': torch.tensor([class_sample]),
+                'query_class_presence': torch.tensor(query_class_presence)}
 
         return batch
 

@@ -122,10 +122,10 @@ class MeterCallback(Callback):
         pl_module.train_mode()
 
     def on_validation_epoch_start(self, trainer, pl_module):
-        self._shared_eval_epoch_start(trainer.val_dataloaders[0].dataset, pl_module)
+        self._shared_eval_epoch_start(trainer.val_dataloaders.dataset, pl_module)
 
     def on_test_epoch_start(self, trainer, pl_module):
-        self._shared_eval_epoch_start(trainer.test_dataloaders[0].dataset, pl_module)
+        self._shared_eval_epoch_start(trainer.test_dataloaders.dataset, pl_module)
 
     def _shared_eval_epoch_start(self, dataset, pl_module):
         utils.fix_randseed(0)
