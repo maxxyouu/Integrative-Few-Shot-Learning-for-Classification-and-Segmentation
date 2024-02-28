@@ -137,7 +137,7 @@ class iFSLModule(pl.LightningModule):
 
         with torch.no_grad():
             pred_cls = self.collect_class_presence(shared_masks)
-            pred_seg = logit_seg.argmax(dim=1)
+            pred_seg = logit_seg.argmax(dim=1) # either 0 or 1 for background and foreground
 
         return pred_cls, pred_seg, logit_seg
 

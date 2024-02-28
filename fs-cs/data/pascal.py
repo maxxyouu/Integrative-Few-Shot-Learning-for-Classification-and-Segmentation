@@ -75,7 +75,7 @@ class DatasetPASCAL(Dataset):
                 'support_names': support_names,
                 'support_ignore_idxs': support_ignore_idxs,
 
-                'support_classes': torch.tensor([class_sample]),
+                'support_classes': torch.tensor([class_sample+1]), # class_sample + 1 is the class id (image name label) not class index id
                 'query_class_presence': torch.tensor(query_class_presence)}
 
         return batch
@@ -108,6 +108,7 @@ class DatasetPASCAL(Dataset):
         return Image.open(os.path.join(self.img_path, img_name) + '.jpg')
 
     def sample_episode(self, idx):
+        # NOTE: idx is not a class id
         # return a triple of the query image name (1 image), support image names (length of self.shot), class (one label)
 
         # recall img_metadata is a list of tuples
@@ -122,6 +123,7 @@ class DatasetPASCAL(Dataset):
                 if query_name != support_name: support_names.append(support_name)
                 if len(support_names) == self.shot: break
 
+        # NOTE: note that class_sample is already start from 1 derived from the image name
         return query_name, support_names, class_sample
 
     def build_class_ids(self):
@@ -129,7 +131,8 @@ class DatasetPASCAL(Dataset):
         nclass_trn = self.nclass // self.nfolds
 
         # train fold i has the same set of classes as val fold i
-        # note that the class id starts from 0 => that is why you minus 1 in build_img_metadata function
+        # note that the class id starts from 1 from the image name => that is why you minus 1 in build_img_metadata function
+        # because the class id here are the index start from 0
         class_ids_val = [self.fold * nclass_trn + i for i in range(nclass_trn)]
         class_ids_trn = [x for x in range(self.nclass) if x not in class_ids_val]
         
