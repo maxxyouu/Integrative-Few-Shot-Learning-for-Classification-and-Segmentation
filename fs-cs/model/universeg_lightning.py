@@ -203,9 +203,13 @@ class UniverSeg(iFSLModule):
         batch['support_imgs'].shape : [bsz, way, shot, 3, H, W] [2 batch, 40 shots, channel, 128 h, 128 w]
         batch['support_masks'].shape : [bsz, way, shot, H, W]
         '''
-        # copy the forward code from the original universeg implementation
-        support_images = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w') # resulting shape = [b, shot,c, h, w]
-        support_labels = None if self.weak else rearrange(batch['support_masks'], 'b n s h w -> (b n) s 1 h w') # resulting shape = [b, shot,c, h, w]
+        # NOTE: the following code is needed for the pascal_origin.py file
+        # support_images = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w') # resulting shape = [b, shot,c, h, w]
+        # support_labels = None if self.weak else rearrange(batch['support_masks'], 'b n s h w -> (b n) s 1 h w') # resulting shape = [b, shot,c, h, w]
+
+        # NOTE: the following is needed for the pascal.py file obtained from L_Seg paper
+        support_images = batch['support_imgs']# resulting shape = [b, shot,c, h, w]
+        support_labels = None if self.weak else rearrange(batch['support_masks'], 'b s h w -> b s 1 h w') # resulting shape = [b, shot,c, h, w]
         target_image = batch['query_img'] #[b, c, h, w]
 
         target = rearrange(target_image, "B C H W -> B 1 C H W") # #[b, 1, c, h, w]
