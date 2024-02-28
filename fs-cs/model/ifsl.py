@@ -109,15 +109,15 @@ class iFSLModule(pl.LightningModule):
             from common.vis import Visualizer
             Visualizer.initialize(True, self.way)
             Visualizer.visualize_prediction_batch(batch['support_imgs'].squeeze(2),
-                                                  batch['support_masks'].squeeze(2),
-                                                  batch['query_img'],
-                                                  batch['query_mask'],
-                                                  batch['org_query_imsize'],
-                                                  pred_seg,
-                                                  batch_idx,
-                                                  iou_b=iou_b,
-                                                  er_b=er_b,
-                                                  to_cpu=True)
+                                                batch['support_masks'].squeeze(2),
+                                                batch['query_img'],
+                                                batch['query_mask'],
+                                                batch['org_query_imsize'],
+                                                pred_seg,
+                                                batch_idx,
+                                                iou_b=iou_b,
+                                                er_b=er_b,
+                                                to_cpu=True)
 
     def test_epoch_end(self, test_step_outputs):
         miou = self.average_meter.compute_iou()
@@ -165,13 +165,12 @@ class iFSLModule(pl.LightningModule):
         return F.nll_loss(prob_avg, gt_presence.long().squeeze(-1))
 
     def merge_bg_masks(self, shared_fg_masks):
-        # B, N, H, W
+        # resulting shape: B, N-way, H, W;
         logit_fg = shared_fg_masks[:, :, 1]
-        # B, 1, H, W
+        # resulting shape B, 1, H, W
         logit_episodic_bg = shared_fg_masks[:, :, 0].mean(dim=1)
-        # B, (1 + N), H, W
+        # B, (1 + N), H, W  NOTE: there is no difference for 1-way
         logit_mask = torch.cat((logit_episodic_bg.unsqueeze(1), logit_fg), dim=1)
-
         return logit_mask
 
     def get_progress_bar_dict(self):

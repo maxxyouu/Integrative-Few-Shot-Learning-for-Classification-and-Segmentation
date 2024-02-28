@@ -231,7 +231,7 @@ class UniverSeg(iFSLModule):
         logits = self.out_conv(target)
         
         # should be for dimension of foreground and background
-        shared_masks = torch.log_softmax(logits, dim=1)
+        shared_masks = torch.log_softmax(logits, dim=1).unsqueeze(1) # B 1-way C H W
 
         # NOTE: for out_channels = 1: we have to use log sigmoid + bceCE and not log softmax + negative log likelihood 
         # log_sigmoid = nn.LogSigmoid()

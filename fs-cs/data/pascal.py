@@ -62,19 +62,19 @@ class DatasetPASCAL(Dataset):
         assert query_class_presence.int().sum() == (len(torch.unique(query_mask)) - 1)
 
         batch = {'query_img': query_img,
-                 'query_mask': query_mask,
-                 'query_name': query_name,
-                 'query_ignore_idx': query_ignore_idx,
+                'query_mask': query_mask,
+                'query_name': query_name,
+                'query_ignore_idx': query_ignore_idx,
 
-                 'org_query_imsize': org_qry_imsize,
+                'org_query_imsize': org_qry_imsize,
 
-                 'support_imgs': support_imgs,
-                 'support_masks': support_masks,
-                 'support_names': support_names,
-                 'support_ignore_idxs': support_ignore_idxs,
+                'support_imgs': support_imgs,
+                'support_masks': support_masks,
+                'support_names': support_names,
+                'support_ignore_idxs': support_ignore_idxs,
 
-                 'support_classes': _support_classes,
-                 'query_class_presence': query_class_presence}
+                'support_classes': _support_classes,
+                'query_class_presence': query_class_presence}
 
         return batch
 
