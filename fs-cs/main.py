@@ -30,7 +30,7 @@ def main(args):
 
     # Pytorch-lightning main trainer
     checkpoint_callback = CustomCheckpoint(args)
-    trainer = Trainer(accelerator='cpu', #accelerator='dp',  # DataParallel TODO: run on different accelerator in the lab env
+    trainer = Trainer(accelerator='auto', #accelerator='dp',  # DataParallel TODO: run on different accelerator in the lab env
                     callbacks=[MeterCallback(args), CustomCheckpoint(args), TQDMProgressBar(refresh_rate=1)], #
                     # num_nodes=torch.cuda.device_count(), # gpus=torch.cuda.device_count(),
                     logger=False if args.nowandb or args.eval else OnlineLogger(args),
@@ -62,11 +62,11 @@ if __name__ == '__main__':
     parser.add_argument('--datapath', type=str,
                         default='/Users/maxxyouu/Desktop/Integrative-Few-Shot-Learning-for-Classification-and-Segmentation/datasets/pascal/VOCdevkit', 
                         help='Dataset path containing the root dir of pascal & coco')
-    parser.add_argument('--method', type=str, default='universeg', choices=['panet', 'pfenet', 'hsnet', 'asnet', 'asnethm', 'universeg'], help='FS-CS methods')
+    parser.add_argument('--method', type=str, default='hsnet', choices=['panet', 'pfenet', 'hsnet', 'asnet', 'asnethm', 'universeg'], help='FS-CS methods')
     parser.add_argument('--benchmark', type=str, default='pascal', choices=['pascal', 'coco'], help='Experiment benchmark')
     parser.add_argument('--logpath', type=str, default='', help='Checkpoint saving dir identifier')
     parser.add_argument('--way', type=int, default=1, help='N-way for K-shot evaluation episode')
-    parser.add_argument('--shot', type=int, default=2, help='K-shot for N-way K-shot evaluation episode: fixed to 1 for training')
+    parser.add_argument('--shot', type=int, default=1, help='K-shot for N-way K-shot evaluation episode: fixed to 1 for training')
     parser.add_argument('--bsz', type=int, default=1, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--niter', type=int, default=2000, help='Max iterations')

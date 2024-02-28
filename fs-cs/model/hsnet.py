@@ -46,9 +46,11 @@ class HypercorrSqueezeNetwork(iFSLModule):
         support_imgs.shape : [bsz, way, 3, H, W]
         support_masks.shape : [bsz, way, H, W]
         '''
-
+        # NOTE: to do multiple shots, we need to modify the implementation.
         support_img = rearrange(batch['support_imgs'].squeeze(2), 'b n c h w -> (b n) c h w')
         support_mask = rearrange(batch['support_masks'].squeeze(2), 'b n h w -> (b n) h w')
+        # support_img = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w')
+        # support_mask = rearrange(batch['support_masks'], 'b n s h w -> (b n) s h w')
         query_img = batch['query_img']
 
         with torch.no_grad():
