@@ -57,6 +57,7 @@ def main(args):
 if __name__ == '__main__':
 
     # Arguments parsing
+    # from the labL E:\\Integrative-Few-Shot-Learning-for-Classification-and-Segmentation\\datasets\\pascal\VOCdevkit
     # /Users/maxxyouu/Desktop/Integrative-Few-Shot-Learning-for-Classification-and-Segmentation/datasets/pascal/VOCdevkit
     parser = argparse.ArgumentParser(description='Methods for Integrative Few-Shot Classification and Segmentation')
     parser.add_argument('--datapath', type=str,
