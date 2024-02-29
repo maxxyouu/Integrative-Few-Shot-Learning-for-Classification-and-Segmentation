@@ -66,18 +66,18 @@ class iFSLModule(pl.LightningModule):
             self.log(f'{split}/loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=False)
         return loss
 
-    def on_train_epoch_end(self, training_step_outputs):
-        self._shared_epoch_end(training_step_outputs)
+    def on_train_epoch_end(self):
+        self._shared_epoch_end()
 
     def validation_step(self, batch, batch_idx):
         # model.eval() and torch.no_grad() are called automatically for validation
         # in pytorch_lightning
         self.training_step(batch, batch_idx)
 
-    def on_validation_epoch_end(self, validation_step_outputs):
+    def on_validation_epoch_end(self):
         # model.eval() and torch.no_grad() are called automatically for validation
         # in pytorch_lightning
-        self._shared_epoch_end(validation_step_outputs)
+        self._shared_epoch_end()
 
     def _shared_epoch_end(self, steps_outputs):
         split = 'trn' if self.training else 'val'
