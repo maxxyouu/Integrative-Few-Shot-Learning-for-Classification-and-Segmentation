@@ -79,7 +79,7 @@ class iFSLModule(pl.LightningModule):
         # in pytorch_lightning
         self._shared_epoch_end()
 
-    def _shared_epoch_end(self, steps_outputs):
+    def _shared_epoch_end(self):
         split = 'trn' if self.training else 'val'
         miou = self.average_meter.compute_iou()
         er = self.average_meter.compute_cls_er()
