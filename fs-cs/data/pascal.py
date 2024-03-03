@@ -110,6 +110,7 @@ class DatasetPASCAL(Dataset):
             temp = fda.FDA_source_to_target_np(spprt.detach().cpu().numpy(), qry_img_cpy.detach().cpu().numpy(), L=self.fda)
             temp = torch.from_numpy(temp).to(spprt.device)
 
+            # for pytorch implementation, check https://arxiv.org/pdf/2303.06088.pdf
             # temp2 = fda.FDA_source_to_target(spprt.unsqueeze(0), qry_img_cpy.unsqueeze(0)).squeeze(0)
             # torch.testing.assert_close(temp, temp2, check_stride=False)
             spprts_in_trg.append(temp)
