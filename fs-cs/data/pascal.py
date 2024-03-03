@@ -6,10 +6,12 @@ import torch.nn.functional as F
 import torch
 import PIL.Image as Image
 import numpy as np
+from common import fda_utils as fda
+from torchvision import transforms
 
 
 class DatasetPASCAL(Dataset):
-    def __init__(self, datapath, fold, transform, split, way, shot, use_original_imgsize=True):
+    def __init__(self, datapath, fold, transform, split, way, shot, fda, use_original_imgsize=True):
         self.split = 'val' if split in ['val', 'test'] else 'trn'
         self.fold = fold
         self.nfolds = 4
@@ -17,6 +19,7 @@ class DatasetPASCAL(Dataset):
         self.way = way # NOTE: in our case, by default it is always one way
         self.benchmark = 'pascal'
         self.shot = shot
+        self.fda = fda
         self.use_original_imgsize = use_original_imgsize
 
         self.img_path = os.path.join(datapath, 'VOC2012/JPEGImages/')
@@ -26,6 +29,10 @@ class DatasetPASCAL(Dataset):
         self.class_ids = self.build_class_ids()
         self.img_metadata = self.build_img_metadata()
         self.img_metadata_classwise = self.build_img_metadata_classwise()
+
+        self.img_mean = [0.485, 0.456, 0.406]
+        self.img_std = [0.229, 0.224, 0.225]
+        self.normalization = transforms.Normalize(self.img_mean, self.img_std)
 
     def __len__(self):
         return len(self.img_metadata) if self.split == 'trn' else min(1000, len(self.img_metadata))
@@ -61,6 +68,11 @@ class DatasetPASCAL(Dataset):
         else:
             support_masks = []
             support_ignore_idxs = []
+
+        # NOTE: perform fda operation from each episodes
+        if self.fda > 0.:
+            std_query, std_supports = self.episode_style_standardization(query_img, support_imgs)
+            query_img, support_imgs = std_query, std_supports
         
         # use this batch information for testing
         batch = {'query_img': query_img,
@@ -79,6 +91,35 @@ class DatasetPASCAL(Dataset):
                 'query_class_presence': torch.tensor(query_class_presence)}
 
         return batch
+
+    def episode_style_standardization(self, query_img, support_imgs):
+        """ use the query as style anchor and standardize the style of support
+        check implementation here: https://stackoverflow.com/questions/71515439/equivalent-to-torch-rfft-in-newest-pytorch-version
+        Args:
+            query_img (tensor): of shape [c, h, w]
+            support_imgs (tesnor): of shape [s, c, h, w]
+        """
+        # style standardization and then mean subtraction and normalization 
+        spprts_in_trg = []
+        qry_img_cpy = query_img.clone()
+        support_imgs_cpy = support_imgs.clone()
+        for k in range(support_imgs_cpy.shape[0]):
+            spprt = support_imgs_cpy[k, :] # [c, h, w]
+
+            # convert to np then convert back to tensor type.
+            temp = fda.FDA_source_to_target_np(spprt.detach().cpu().numpy(), qry_img_cpy.detach().cpu().numpy(), L=self.fda)
+            temp = torch.from_numpy(temp).to(spprt.device)
+
+            # temp2 = fda.FDA_source_to_target(spprt.unsqueeze(0), qry_img_cpy.unsqueeze(0)).squeeze(0)
+            # torch.testing.assert_close(temp, temp2, check_stride=False)
+            spprts_in_trg.append(temp)
+
+        spprts_in_trg = torch.stack(spprts_in_trg, dim=0).float()
+
+        # after style standardization, normalize the images in the episode.
+        std_query = self.normalization(query_img)
+        std_supports = self.normalization(spprts_in_trg)
+        return std_query, std_supports
 
     def extract_ignore_idx(self, mask, class_id):
         # only get the class of interest here

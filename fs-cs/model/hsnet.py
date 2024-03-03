@@ -93,7 +93,7 @@ class HypercorrSqueezeNetwork(iFSLModule):
             logit_mask_agg += logit_seg.clone()
             if nshot == 1:
                 return pred_cls, pred_seg
-
+        # voting for nshot prediction
         pred_cls = (cls_score_agg / float(nshot)) >= 0.5
         pred_seg = (logit_mask_agg / float(nshot)).argmax(dim=1)
         return pred_cls, pred_seg

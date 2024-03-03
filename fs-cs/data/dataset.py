@@ -24,9 +24,15 @@ class FSCSDatasetModule(LightningDataModule):
             'pascal': DatasetPASCAL,
             'coco': DatasetCOCO,
         }
-        self.transform = transforms.Compose([transforms.Resize(size=(self.img_size, self.img_size)),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize(self.img_mean, self.img_std)])
+        self.use_fda = args.fda
+        if args.fda > 0.:
+            # perform mean subtration and normalization after fda operation. otherwise it create artifacts mentioned in here
+            # https://github.com/YanchaoYang/FDA
+            self.transform = transforms.Compose([transforms.Resize(size=(self.img_size, self.img_size)), transforms.ToTensor()])
+        else:
+            self.transform = transforms.Compose([transforms.Resize(size=(self.img_size, self.img_size)),
+                                                transforms.ToTensor(),
+                                                transforms.Normalize(self.img_mean, self.img_std)])
 
     def train_dataloader(self):
         dataset = self.datasets[self.args.benchmark](self.datapath,
@@ -34,7 +40,8 @@ class FSCSDatasetModule(LightningDataModule):
                                                      transform=self.transform,
                                                      split='trn',
                                                      way=self.args.way,
-                                                     shot=self.args.shot)  #NOTE: for ifsi only shot=1 is supported shot=1 fixed for training
+                                                     shot=self.args.shot,
+                                                     fda=self.use_fda)  #NOTE: for ifsi only shot=1 is supported shot=1 fixed for training
         dataloader = DataLoader(dataset, batch_size=self.args.bsz, shuffle=True, num_workers=8)
         return dataloader
 
@@ -44,7 +51,8 @@ class FSCSDatasetModule(LightningDataModule):
                                                      transform=self.transform,
                                                      split='val',
                                                      way=self.args.way,
-                                                     shot=self.args.shot)
+                                                     shot=self.args.shot,
+                                                     fda=self.use_fda)
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=8)
         return dataloader
 
