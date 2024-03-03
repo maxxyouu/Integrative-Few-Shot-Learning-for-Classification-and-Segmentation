@@ -66,7 +66,7 @@ class PriorGuidedFeatureEnrichmentNetwork(iFSLModule):
         support_masks.shape : [bsz, way, shot, H, W]
         '''
 
-        with torch.no_grad():
+        with torch.no_grad(): # TODO: do we need this?
             # NOTE: default implementation only support 1-shot inference, to do multiple shots, we need to modify the implementation.
             support_imgs = rearrange(batch['support_imgs'], 'b s c h w -> (b s) c h w')
             support_masks = rearrange(batch['support_masks'], 'b s h w -> (b s) h w')

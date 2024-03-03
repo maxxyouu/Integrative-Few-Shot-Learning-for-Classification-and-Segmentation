@@ -79,5 +79,6 @@ if __name__ == '__main__':
     parser.add_argument('--resume', action='store_true', help='Flag to resume a finished run')
     parser.add_argument('--vis', action='store_true', help='Flag to visualize. Use with --eval')
     args = parser.parse_args()
-
+    args.nowandb = True
+    args.weak = False
     main(args)

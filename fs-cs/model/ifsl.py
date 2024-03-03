@@ -54,10 +54,10 @@ class iFSLModule(pl.LightningModule):
         shared_masks = self.forward(batch)
         pred_cls, pred_seg, logit_seg = self.predict_cls_and_mask(shared_masks, batch)
 
-        if self.weak:
-            loss = self.compute_cls_objective(shared_masks, batch['query_class_presence'])
-        else:
-            loss = self.compute_seg_objective(logit_seg, batch['query_mask'])
+        # if self.weak:
+        #     loss = self.compute_cls_objective(shared_masks, batch['query_class_presence'])
+        # else:
+        loss = self.compute_seg_objective(logit_seg, batch['query_mask'])
 
         with torch.no_grad():
             self.average_meter.update_cls(pred_cls, batch['query_class_presence'])

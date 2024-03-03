@@ -38,6 +38,11 @@ class HypercorrSqueezeNetwork(iFSLModule):
         self.lids = reduce(add, [[i + 1] * x for i, x in enumerate(nbottlenecks)])
         self.stack_ids = torch.tensor(self.lids).bincount().__reversed__().cumsum(dim=0)[:3]
         self.backbone.eval()
+
+        # explicitly freeze the backbone
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+
         self.learner = HPNLearner(list(reversed(nbottlenecks[-3:])), args.way)
 
     def forward(self, batch):
@@ -46,14 +51,15 @@ class HypercorrSqueezeNetwork(iFSLModule):
         support_imgs.shape : [bsz, way, 3, H, W]
         support_masks.shape : [bsz, way, H, W]
         '''
-        # NOTE: default implementation only support 1-shot inference, to do multiple shots, we need to modify the implementation.
-        support_img = rearrange(batch['support_imgs'], 'b s c h w -> (b s) c h w')
-        support_mask = rearrange(batch['support_masks'], 'b s h w -> (b s) h w')
-        # support_img = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w')
-        # support_mask = rearrange(batch['support_masks'], 'b n s h w -> (b n) s h w')
-        query_img = batch['query_img']
-
+        # extract the backbone (e.g. ResNet50) features without fine-tuning.
         with torch.no_grad():
+            # NOTE: default implementation only support 1-shot inference, to do multiple shots, we need to modify the implementation.
+            support_img = rearrange(batch['support_imgs'], 'b s c h w -> (b s) c h w')
+            support_mask = rearrange(batch['support_masks'], 'b s h w -> (b s) h w')
+            # support_img = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w')
+            # support_mask = rearrange(batch['support_masks'], 'b n s h w -> (b n) s h w')
+            query_img = batch['query_img']
+
             query_feats = self.extract_feats(query_img, self.backbone, self.feat_ids, self.bottleneck_ids, self.lids)
             support_feats = self.extract_feats(support_img, self.backbone, self.feat_ids, self.bottleneck_ids, self.lids)
             support_feats = self.mask_feature(support_feats, support_mask.clone())

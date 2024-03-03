@@ -14,7 +14,7 @@ class DatasetPASCAL(Dataset):
         self.fold = fold
         self.nfolds = 4
         self.nclass = 20
-        self.way = way
+        self.way = way # NOTE: in our case, by default it is always one way
         self.benchmark = 'pascal'
         self.shot = shot
         self.use_original_imgsize = use_original_imgsize
@@ -33,7 +33,7 @@ class DatasetPASCAL(Dataset):
     def __getitem__(self, idx):
         idx %= len(self.img_metadata)  # for testing, as n_images < 1000
         query_name, support_names, class_sample = self.sample_episode(idx)
-        query_img, query_cmask, support_imgs, support_cmasks, org_qry_imsize = self.load_frame(query_name, support_names) # cmask stands for class mask
+        query_img, query_cmask, support_imgs, support_cmasks, org_qry_imsize = self.load_frame(query_name, support_names) # cmask stands for class mask, load the actual images from the image names
 
         query_class_presence = [s_c in torch.unique(query_cmask) for s_c in [class_sample+1]]  # needed - 1
 
@@ -48,7 +48,7 @@ class DatasetPASCAL(Dataset):
             support_imgs = torch.stack([self.transform(support_img) for support_img in support_imgs])
 
             support_masks = []
-            support_ignore_idxs = []
+            support_ignore_idxs = [] # these are the border pixels
             for scmask in support_cmasks:
                 scmask = F.interpolate(scmask.unsqueeze(0).unsqueeze(0).float(), support_imgs.size()[-2:], mode='nearest').squeeze()
                 support_mask, support_ignore_idx = self.extract_ignore_idx(scmask, class_sample)
@@ -156,7 +156,7 @@ class DatasetPASCAL(Dataset):
         img_metadata = []
         if self.split == 'trn':  # For training, read image-metadata of "the other" folds
             for fold_id in range(self.nfolds):
-                if fold_id == self.fold:  # Skip validation fold, the rest of the three folds
+                if fold_id == self.fold:  # Skip target fold, the rest of the three folds are used for training
                     continue
                 img_metadata += read_metadata(self.split, fold_id)
         elif self.split == 'val':  # For validation, read image-metadata of "current" fold
@@ -175,6 +175,7 @@ class DatasetPASCAL(Dataset):
         for class_id in range(self.nclass):
             img_metadata_classwise[class_id] = []
 
+        # collect per-class training samples with the target classes be empty.
         for img_name, img_class in self.img_metadata:
             img_metadata_classwise[img_class] += [img_name]
         return img_metadata_classwise
