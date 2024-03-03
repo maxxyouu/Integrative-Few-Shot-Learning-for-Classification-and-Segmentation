@@ -57,6 +57,10 @@ class PriorGuidedFeatureEnrichmentNetwork(iFSLModule):
         self.backbone2.eval()
         self.backbone3.eval()
         self.backbone4.eval()
+        backbones = [self.backbone0, self.backbone1, self.backbone2, self.backbone3, self.backbone4]
+        for backbone_t in backbones:
+            for param in backbone_t.parameters():
+                param.requires_grad = False
         self.learner = PFENetLearner(args.way, args.shot)
 
     def forward(self, batch):
@@ -79,6 +83,7 @@ class PriorGuidedFeatureEnrichmentNetwork(iFSLModule):
 
             query_img = batch['query_img']
 
+        # internally feature extractor are used with backbone freezed.
         qry_feat, qry_feat4 = self.extract_qry_feat(query_img)
         spt_feat, spt_feat4, mask_list = self.extract_spt_feat(support_imgs, support_masks, support_ignore_idxs)
         corr_query_mask = self.correlation_query_mask(qry_feat, qry_feat4, spt_feat4, mask_list)
