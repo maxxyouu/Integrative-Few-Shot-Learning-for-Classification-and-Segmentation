@@ -68,13 +68,13 @@ class PriorGuidedFeatureEnrichmentNetwork(iFSLModule):
 
         with torch.no_grad():
             # NOTE: default implementation only support 1-shot inference, to do multiple shots, we need to modify the implementation.
-            support_img = batch['support_imgs']
-            support_mask = batch['support_masks']
+            support_imgs = rearrange(batch['support_imgs'], 'b s c h w -> (b s) c h w')
+            support_masks = rearrange(batch['support_masks'], 'b s h w -> (b s) h w')
             # support_imgs = rearrange(batch['support_imgs'], 'b n s c h w -> (b n) s c h w')
             # support_masks = rearrange(batch['support_masks'], 'b n s h w -> (b n) s h w')
             support_ignore_idxs = batch.get('support_ignore_idxs')
             if support_ignore_idxs is not None:
-                support_ignore_idxs = rearrange(batch['support_ignore_idxs'], 'b n h w -> (b n) h w')
+                support_ignore_idxs = rearrange(batch['support_ignore_idxs'], 'b s h w -> (b s) h w')
                 # support_ignore_idxs = rearrange(batch['support_ignore_idxs'], 'b n s h w -> (b n) s h w')
 
             query_img = batch['query_img']
