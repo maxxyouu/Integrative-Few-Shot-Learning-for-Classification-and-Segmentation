@@ -63,11 +63,11 @@ if __name__ == '__main__':
     parser.add_argument('--datapath', type=str,
                         default='/Users/maxxyouu/Desktop/Integrative-Few-Shot-Learning-for-Classification-and-Segmentation/datasets/pascal/VOCdevkit', 
                         help='Dataset path containing the root dir of pascal & coco')
-    parser.add_argument('--method', type=str, default='universeg', choices=['panet', 'pfenet', 'hsnet', 'asnet', 'asnethm', 'universeg'], help='FS-CS methods')
+    parser.add_argument('--method', type=str, default='hsnet', choices=['panet', 'pfenet', 'hsnet', 'asnet', 'asnethm', 'universeg'], help='FS-CS methods')
     parser.add_argument('--benchmark', type=str, default='pascal', choices=['pascal', 'coco'], help='Experiment benchmark')
     parser.add_argument('--logpath', type=str, default='', help='Checkpoint saving dir identifier')
     parser.add_argument('--way', type=int, default=1, help='N-way for K-shot evaluation episode')
-    parser.add_argument('--shot', type=int, default=1, help='K-shot for N-way K-shot evaluation episode: fixed to 1 for training')
+    parser.add_argument('--shot', type=int, default=2, help='K-shot for N-way K-shot evaluation episode: fixed to 1 for training')
     parser.add_argument('--bsz', type=int, default=1, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--niter', type=int, default=2000, help='Max iterations')

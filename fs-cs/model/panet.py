@@ -46,11 +46,17 @@ class PrototypeAlignmentNetwork(iFSLModule):
         support_imgs.shape : [bsz, way, shot, 3, H, W]
         support_masks.shape : [bsz, way, shot, H, W]
         '''
-        support_imgs = rearrange(batch['support_imgs'], 'b n s c h w -> (b n s) c h w')
-        support_masks = rearrange(batch['support_masks'], 'b n s h w -> (b n s) h w')
+        # NOTE: default implementation only support 1-shot inference, to do multiple shots, we need to modify the implementation.
+        support_img = batch['support_imgs']
+        support_mask = batch['support_masks']
+        # support_imgs = rearrange(batch['support_imgs'], 'b n s c h w -> (b n s) c h w')
+        # support_masks = rearrange(batch['support_masks'], 'b n s h w -> (b n s) h w')
+
         support_ignore_idxs = batch.get('support_ignore_idxs')
         if support_ignore_idxs is not None:
-            support_ignore_idxs = rearrange(batch['support_ignore_idxs'], 'b n s h w -> (b n s) h w')
+            support_ignore_idxs = rearrange(batch['support_ignore_idxs'], 'b n h w -> (b n) h w')
+            # support_ignore_idxs = rearrange(batch['support_ignore_idxs'], 'b n s h w -> (b n s) h w')
+
         query_img = batch['query_img']
 
         query_feats = self.extract_feats(query_img, self.backbone, self.feat_ids, self.bottleneck_ids, self.lids)
