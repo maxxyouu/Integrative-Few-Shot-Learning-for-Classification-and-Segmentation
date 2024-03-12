@@ -63,12 +63,12 @@ if __name__ == '__main__':
     parser.add_argument('--datapath', type=str,
                         default='/Users/maxxyouu/Desktop/Integrative-Few-Shot-Learning-for-Classification-and-Segmentation/datasets/pascal/VOCdevkit', 
                         help='Dataset path containing the root dir of pascal & coco')
-    parser.add_argument('--method', type=str, default='hsnet', choices=['panet', 'pfenet', 'hsnet', 'asnet', 'asnethm', 'universeg'], help='FS-CS methods')
+    parser.add_argument('--method', type=str, default='universeg', choices=['panet', 'pfenet', 'hsnet', 'asnet', 'asnethm', 'universeg'], help='FS-CS methods')
     parser.add_argument('--benchmark', type=str, default='pascal', choices=['pascal', 'coco'], help='Experiment benchmark')
     parser.add_argument('--logpath', type=str, default='', help='Checkpoint saving dir identifier')
     parser.add_argument('--way', type=int, default=1, help='N-way for K-shot evaluation episode')
     parser.add_argument('--shot', type=int, default=1, help='K-shot for N-way K-shot evaluation episode: fixed to 1 for training')
-    parser.add_argument('--bsz', type=int, default=8, help='Batch size')
+    parser.add_argument('--bsz', type=int, default=1, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--niter', type=int, default=2000, help='Max iterations')
     parser.add_argument('--fold', type=int, default=0, choices=[0, 1, 2, 3], help='4-fold validation fold')
@@ -78,7 +78,16 @@ if __name__ == '__main__':
     parser.add_argument('--weak', action='store_true', help='Flag to train with cls (weak) labels -- reduce learning rate by 10 times')
     parser.add_argument('--resume', action='store_true', help='Flag to resume a finished run')
     parser.add_argument('--vis', action='store_true', help='Flag to visualize. Use with --eval')
+    parser.add_argument('--dice', type=bool, default=False, help='using the dice loss function otherwise using the cross entropy loss')
+
     args = parser.parse_args()
     args.nowandb = True
     args.weak = False
+
+    # automatically switch to dice loss and lower learning rate for universeg model
+    if args.method == 'universeg':
+        # according to the universeg implemenation.
+        args.dice = True
+        args.lr = 1e-4
+        # args.bsz = 1
     main(args)

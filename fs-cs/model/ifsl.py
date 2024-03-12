@@ -2,7 +2,7 @@ import math
 import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
-
+import numpy as np
 
 class iFSLModule(pl.LightningModule):
     """
@@ -15,6 +15,7 @@ class iFSLModule(pl.LightningModule):
         self.weak = args.weak
         self.range = torch.arange(args.way + 1, requires_grad=False).view(1, args.way + 1, 1, 1)
         self.learner = None
+        self.dice = args.dice
 
     def forward(self, batch):
         pass
@@ -57,7 +58,10 @@ class iFSLModule(pl.LightningModule):
         # if self.weak:
         #     loss = self.compute_cls_objective(shared_masks, batch['query_class_presence'])
         # else:
-        loss = self.compute_seg_objective(logit_seg, batch['query_mask'])
+        if self.dice:
+            loss = self.compute_soft_dice_loss(logit_seg, batch['query_mask'])
+        else:
+            loss = self.compute_seg_objective(logit_seg, batch['query_mask'])
 
         with torch.no_grad():
             self.average_meter.update_cls(pred_cls, batch['query_class_presence'])
@@ -157,6 +161,70 @@ class iFSLModule(pl.LightningModule):
     def compute_seg_objective(self, logit_mask, gt_mask):
         ''' supports 1-way training '''
         return F.nll_loss(logit_mask, gt_mask.long())
+    
+    def compute_soft_dice_loss(self, logit_mask, gt_mask):
+        return self._dice_loss(logit_mask, gt_mask)
+
+    def _dice_loss(self, input, target):
+        """
+        input is a torch variable of size BatchxnclassesxHxW representing log probabilities for each class
+        target is a 1-hot representation of the groundtruth, shoud have same size as the input
+        
+        code obtained from https://github.com/pytorch/pytorch/issues/1249
+        and https://github.com/rogertrullo/pytorch/blob/rogertrullo-dice_loss/torch/nn/functional.py#L708
+
+        """
+        ## ------------------ matching the target tensor shape to the input tensor shape START -------------------------
+        # for safety only, target.requires_grad is false
+        target_fore = target.clone().detach()
+        target_back = target.clone().detach()
+
+        # perform label flipping to get the background groundtruth
+        target_back[target_back > 0.] = 2. # foregound is set to 2 for future replacement 
+        target_back[target_back < 1.] = 1. # background is set to 1. as the groundtruth label
+        target_back[target_back == 2.] = 0. # reset the foreground labels of the target oject as background
+        target = torch.stack([target_back, target_fore], dim=1)
+        ## ------------------ matching the target tensor shape to the input tensor shape END -------------------------
+
+        assert input.size() == target.size(), "Input sizes must be equal."
+        assert input.dim() == 4, "Input must be a 4D Tensor."
+        uniques=np.unique(target.cpu().numpy())
+        assert set(list(uniques))<=set([0,1]), "target must only contain zeros and ones"
+
+        probs=F.softmax(input)
+        num=probs*target#b,c,h,w--p*g
+        num=torch.sum(num,dim=3)#b,c,h
+        num=torch.sum(num,dim=2)
+        
+
+        den1=probs*probs#--p^2
+        den1=torch.sum(den1,dim=3)#b,c,h
+        den1=torch.sum(den1,dim=2)
+        
+
+        den2=target*target#--g^2
+        den2=torch.sum(den2,dim=3)#b,c,h
+        den2=torch.sum(den2,dim=2)#b,c
+        
+        dice=2*(num/(den1+den2))
+        dice_eso=dice[:,1:]#we ignore bg dice val, and take the fg
+
+        # since we want to minimize the loss function, we put a negative here to get
+        # the equivalent operation as maximize the dice score.
+        dice_total=-1*torch.sum(dice_eso)/dice_eso.size(0)#divide by batch_sz
+        return dice_total
+    
+    # def dice_loss_V2(self, input, target):
+    #     # smooth = 1.
+    #     smooth = 0.
+    #     iflat = input.view(-1)
+    #     tflat = target.view(-1)
+    #     intersection = (iflat * tflat).sum()
+        
+    #     # return 1 - ((2. * intersection + smooth) /
+    #     #         (iflat.sum() + tflat.sum() + smooth))
+    #     return ((2. * intersection + smooth) /
+    #             (iflat.sum() + tflat.sum() + smooth))
 
     def compute_cls_objective(self, shared_masks, gt_presence):
         ''' supports 1-way training '''
