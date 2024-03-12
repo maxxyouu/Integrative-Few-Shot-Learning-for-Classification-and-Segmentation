@@ -89,5 +89,5 @@ if __name__ == '__main__':
         # according to the universeg implemenation.
         args.dice = True
         args.lr = 1e-4
-        # args.bsz = 1
+        args.bsz = 1
     main(args)
