@@ -34,6 +34,8 @@ class DatasetPASCAL(Dataset):
         self.img_std = [0.229, 0.224, 0.225]
         self.normalization = transforms.Normalize(self.img_mean, self.img_std)
 
+        # from the implementation, https://github.com/YanchaoYang/FDA , do the fda on the original image, then do the augmentation (best guess).
+
     def __len__(self):
         return len(self.img_metadata) if self.split == 'trn' else min(1000, len(self.img_metadata))
 
