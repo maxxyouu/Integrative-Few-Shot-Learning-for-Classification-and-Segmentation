@@ -70,7 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--shot', type=int, default=1, help='K-shot for N-way K-shot evaluation episode: fixed to 1 for training')
     parser.add_argument('--bsz', type=int, default=1, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--niter', type=int, default=2000, help='Max iterations')
+    parser.add_argument('--niter', type=int, default=200, help='Max iterations')
     parser.add_argument('--fold', type=int, default=0, choices=[0, 1, 2, 3], help='4-fold validation fold')
     parser.add_argument('--backbone', type=str, default='resnet50', choices=['resnet50', 'resnet101'], help='Backbone CNN network')
     parser.add_argument('--nowandb', action='store_true', help='Flag not to log at wandb')
@@ -79,6 +79,10 @@ if __name__ == '__main__':
     parser.add_argument('--resume', action='store_true', help='Flag to resume a finished run')
     parser.add_argument('--vis', action='store_true', help='Flag to visualize. Use with --eval')
     parser.add_argument('--dice', type=bool, default=False, help='using the dice loss function otherwise using the cross entropy loss')
+
+    parser.add_argument('--use_ppm', type=bool, default=False, help='using pyramid pooling module to encode contexual information')
+    parser.add_argument('--bins', type=list, default=[1, 2, 5, 10], help='scales and number of pyramid pooling, use with args.use_ppm')
+    parser.add_argument('--dropout', type=float, default=0., help='dropout mainly used with ppm module')
 
     args = parser.parse_args()
     args.nowandb = True
@@ -89,5 +93,11 @@ if __name__ == '__main__':
         # according to the universeg implemenation.
         args.dice = True
         args.lr = 1e-4
-        args.bsz = 1
+        args.bsz = 1 # if using 2, must use the groupnorm to work properly
+        args.shot = 2
+        args.use_ppm = True
+
+        if args.use_ppm:
+            args.bins = [1, 2, 5, 10]
+            args.dropout = 0.1
     main(args)

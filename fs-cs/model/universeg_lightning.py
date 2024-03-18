@@ -4,9 +4,12 @@ import math
 from torch import nn
 import torch
 from torchvision.models import resnet
+import torch.nn.functional as F
+
 from einops import rearrange
 from model.base.feature import extract_feat_res
 from model.ifsl import iFSLModule
+
 
 #universeg related
 from .universeg.nn import CrossConv2d
@@ -71,10 +74,10 @@ class ConvOp(nn.Sequential):
             self, self.init_distribution, self.init_bias, self.nonlinearity
         )
 
-
 #@validate_arguments_init
 #@dataclass(eq=False, repr=False)
 class CrossOp(nn.Module):
+    
 
     # in_channels: size2t
     # out_channels: int
@@ -116,13 +119,11 @@ class CrossOp(nn.Module):
         new_target = interaction.mean(dim=1, keepdims=True)
 
         return new_target, interaction
-
+    
 
 # #@validate_arguments_init
 #@dataclass(eq=False, repr=False)
 class CrossBlock(nn.Module):
-
-
 
     def __init__(self, in_channels: size2t, cross_features: int, conv_features: Optional[int] = None, cross_kws: Optional[Dict[str, Any]] = None, conv_kws: Optional[Dict[str, Any]] = None):
         super().__init__()
@@ -146,6 +147,30 @@ class CrossBlock(nn.Module):
         target = self.target(target)
         support = self.support(support)
         return target, support
+    
+
+class PPM(nn.Module):
+    """
+    this module involve the pyramid pooling convolution that encode contextual information
+    and a bottlenect module that summarize the channel dimention.
+    """
+    def __init__(self, in_dim, reduction_dim, bins):
+        super(PPM, self).__init__()
+        self.features = []
+        for bin in bins:
+            self.features.append(nn.Sequential(
+                nn.AdaptiveAvgPool2d(bin),
+                nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
+                nn.ReLU(inplace=True)))
+        self.features = nn.ModuleList(self.features)
+
+    def forward(self, x):
+        x_size = x.size()
+        out = [x]
+        for f in self.features:
+            out.append(F.interpolate(f(x), x_size[2:], mode='bilinear', align_corners=True))
+        out = torch.cat(out, 1)
+        return out
 
 #@validate_arguments_init
 # @dataclass(eq=False, repr=False)
@@ -186,6 +211,21 @@ class UniverSeg(iFSLModule):
             self.enc_blocks.append(block)
             skip_outputs.append(in_ch)
 
+        # a pyramid pooling module that only applied at the end of the encoder
+        self.use_ppm = args.use_ppm
+        self.bins = args.bins
+        self.dropout = args.dropout
+        if self.use_ppm:
+            self.fea_dim = self.encoder_blocks[-1] # the same as the the last number in self.encoder_blocks
+            self.ppm = PPM(self.fea_dim, int(self.fea_dim/len(self.bins)), self.bins)
+            self.fea_dim *= 2
+            self.bottleneck_dim = self.encoder_blocks[-1] # TODO: if this does not work, then try smaller than 64 but also need to modify the decoder dimension
+
+            self.bottleneck = nn.Sequential(
+                nn.Conv2d(self.fea_dim, self.bottleneck_dim, kernel_size=3, padding=1, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(p=self.dropout))
+
         # Decoder
         skip_chs = skip_outputs[-2::-1]
         for (cross_ch, conv_ch), skip_ch in zip(decoder_blocks, skip_chs):
@@ -219,16 +259,39 @@ class UniverSeg(iFSLModule):
 
         for i, encoder_block in enumerate(self.enc_blocks):
             target, support = encoder_block(target, support)
-            if i == len(self.encoder_blocks) - 1:
+            if i == len(self.encoder_blocks) - 1  and not self.use_ppm:
                 break
+
+            # for the last encoder block, if ppm is used => encode the contexual information both the target the support features
+            if i == len(self.encoder_blocks) - 1 and self.use_ppm:
+                target = self.ppm(target.squeeze(1))
+                target = self.bottleneck(target)
+                target = target.unsqueeze(1)
+
+                _, num_sprts, *_ = support.shape
+                sprts = []
+                for s in range(num_sprts):
+                    sprt = support[:, s, :]
+                    sprt_ppm = self.ppm(sprt)
+                    sprt_ppm = self.bottleneck(sprt_ppm)
+                    sprts.append(sprt_ppm)
+                support = torch.stack(sprts, dim=1)
+                break
+
             pass_through.append((target, support))
+
+            # after each encoder block (EXCEPT THE LAST ENCODER BLOCK), downsample it
             target = vmap(self.downsample, target)
             support = vmap(self.downsample, support)
 
         for decoder_block in self.dec_blocks:
             target_skip, support_skip = pass_through.pop()
+
+            # skip connection with upsampled features before the decoder module
             target = torch.cat([vmap(self.upsample, target), target_skip], dim=2)
             support = torch.cat([vmap(self.upsample, support), support_skip], dim=2)
+
+            # concatenate the skipped encoded features with the upsampled features
             target, support = decoder_block(target, support)
 
         target = rearrange(target, "B 1 C H W -> B C H W")
