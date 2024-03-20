@@ -9,10 +9,10 @@ import torch.nn.functional as F
 from einops import rearrange
 from model.base.feature import extract_feat_res
 from model.ifsl import iFSLModule
-
+from model.module.selective_kernel import SelectiveKernel
 
 #universeg related
-from .universeg.nn import CrossConv2d
+from .universeg.nn import CrossConv2d, CrossSKConv2d
 from .universeg.nn import reset_conv2d_parameters
 from .universeg.nn import Vmap, vmap
 from .universeg.validation import (Kwargs, as_2tuple, size2t, validate_arguments,
@@ -48,7 +48,9 @@ class ConvOp(nn.Sequential):
                 kernel_size: size2t = 3, 
                 nonlinearity: Optional[str] = "LeakyReLU", 
                 init_distribution: Optional[str] = "kaiming_normal", 
-                init_bias: Union[None, float, int] = 0.0):
+                init_bias: Union[None, float, int] = 0.0,
+                use_sk: bool = False,
+                sk_split_input=True):
         super().__init__()
 
         self.in_channels = in_channels
@@ -58,17 +60,29 @@ class ConvOp(nn.Sequential):
         self.init_distribution = init_distribution
         self.init_bias = init_bias
 
-        self.conv = nn.Conv2d(
-            self.in_channels,
-            self.out_channels,
-            kernel_size=self.kernel_size,
-            padding=self.kernel_size // 2,
-            padding_mode="zeros",
-            bias=True,
-        )
+        # for selective kernel option
+        if use_sk:
+            self.conv = SelectiveKernel(
+                self.in_channels,
+                self.out_channels,
+                act_layer=nn.LeakyReLU if nonlinearity == 'LeakyReLU' else None,
+                # TODO: might need to specify a padding, double check this.
+                bias=True,
+                split_input=sk_split_input
+            #padding_mode by default is "zeros"
+            )
+        else:
+            self.conv = nn.Conv2d(
+                self.in_channels,
+                self.out_channels,
+                kernel_size=self.kernel_size,
+                padding=self.kernel_size // 2,
+                padding_mode="zeros",
+                bias=True,
+            )
 
-        if self.nonlinearity is not None:
-            self.nonlin = get_nonlinearity(self.nonlinearity)
+            if self.nonlinearity is not None:
+                self.nonlin = get_nonlinearity(self.nonlinearity)
 
         reset_conv2d_parameters(
             self, self.init_distribution, self.init_bias, self.nonlinearity
@@ -77,7 +91,6 @@ class ConvOp(nn.Sequential):
 #@validate_arguments_init
 #@dataclass(eq=False, repr=False)
 class CrossOp(nn.Module):
-    
 
     # in_channels: size2t
     # out_channels: int
@@ -86,7 +99,15 @@ class CrossOp(nn.Module):
     # init_distribution: Optional[str] = "kaiming_normal"
     # init_bias: Union[None, float, int] = 0.0
 
-    def __init__(self, in_channels: size2t, out_channels: int, kernel_size: size2t = 3, nonlinearity: Optional[str] = "LeakyReLU", init_distribution: Optional[str] = "kaiming_normal", init_bias: Union[None, float, int] = 0.0):
+    def __init__(self, 
+                in_channels: size2t, 
+                out_channels: int, 
+                kernel_size: size2t = 3, 
+                nonlinearity: Optional[str] = "LeakyReLU", 
+                init_distribution: Optional[str] = "kaiming_normal", 
+                init_bias: Union[None, float, int] = 0.0,
+                use_sk: bool = False,
+                sk_split_input = True):
         super().__init__()
 
         self.in_channels = in_channels
@@ -96,15 +117,24 @@ class CrossOp(nn.Module):
         self.init_distribution = init_distribution
         self.init_bias = init_bias
 
-        self.cross_conv = CrossConv2d(
-            in_channels=as_2tuple(self.in_channels),
-            out_channels=self.out_channels,
-            kernel_size=self.kernel_size,
-            padding=self.kernel_size // 2,
-        )
+        if use_sk:
+            self.cross_conv = CrossSKConv2d(
+                in_channels=as_2tuple(self.in_channels),
+                out_channels=self.out_channels,
+                kernel_size=self.kernel_size,
+                sk_split_input = sk_split_input
+                # padding=self.kernel_size // 2,
+            )
+        else:
+            self.cross_conv = CrossConv2d(
+                in_channels=as_2tuple(self.in_channels),
+                out_channels=self.out_channels,
+                kernel_size=self.kernel_size,
+                padding=self.kernel_size // 2,
+            )
 
-        if self.nonlinearity is not None:
-            self.nonlin = get_nonlinearity(self.nonlinearity)
+            if self.nonlinearity is not None:
+                self.nonlin = get_nonlinearity(self.nonlinearity)
 
         reset_conv2d_parameters(
             self, self.init_distribution, self.init_bias, self.nonlinearity
@@ -125,7 +155,12 @@ class CrossOp(nn.Module):
 #@dataclass(eq=False, repr=False)
 class CrossBlock(nn.Module):
 
-    def __init__(self, in_channels: size2t, cross_features: int, conv_features: Optional[int] = None, cross_kws: Optional[Dict[str, Any]] = None, conv_kws: Optional[Dict[str, Any]] = None):
+    def __init__(self, 
+                in_channels: size2t, 
+                cross_features: int, 
+                conv_features: Optional[int] = None, 
+                cross_kws: Optional[Dict[str, Any]] = None, 
+                conv_kws: Optional[Dict[str, Any]] = None):
         super().__init__()
 
         self.in_channels = in_channels
@@ -133,6 +168,8 @@ class CrossBlock(nn.Module):
         self.conv_features = conv_features
         self.cross_kws = cross_kws
         self.conv_kws = conv_kws
+
+        assert 'use_sk' in self.conv_kws and 'use_sk' in self.cross_kws
 
         conv_features = self.conv_features or self.cross_features
         cross_kws = self.cross_kws or {}
@@ -161,7 +198,7 @@ class PPM(nn.Module):
             self.features.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(bin),
                 nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
-                nn.ReLU(inplace=True)))
+                nn.LeakyReLU(inplace=True)))
         self.features = nn.ModuleList(self.features)
 
     def forward(self, x):
@@ -171,6 +208,15 @@ class PPM(nn.Module):
             out.append(F.interpolate(f(x), x_size[2:], mode='bilinear', align_corners=True))
         out = torch.cat(out, 1)
         return out
+
+class CrossBlockSequential(nn.Sequential):
+    def __init__(self, *args):
+        super(CrossBlockSequential, self).__init__(*args)
+
+    def forward(self, target, support):
+        for module in self:
+            target, support = module(target, support)
+        return target, support
 
 #@validate_arguments_init
 # @dataclass(eq=False, repr=False)
@@ -194,7 +240,16 @@ class UniverSeg(iFSLModule):
         decoder_blocks = self.decoder_blocks or encoder_blocks[-2::-1]
         decoder_blocks = list(map(as_2tuple, decoder_blocks))
 
-        block_kws = dict(cross_kws=dict(nonlinearity=None))
+        # toggle the selective kernel module in here
+        block_kws = dict(
+            cross_kws=dict(
+                nonlinearity=None, 
+                use_sk=True if args.use_sk else False,
+                sk_split_input=True if args.sk_split_input else False),
+            conv_kws=dict(
+                use_sk=True if args.use_sk else False,
+                sk_split_input=True if args.sk_split_input else False)
+        )
 
         # in_ch = (1, 2) #NOTE: this is for 1d image slice
         # out_channels = 1 #NOTE: for using sigmoid only
@@ -205,8 +260,20 @@ class UniverSeg(iFSLModule):
 
         # Encoder
         skip_outputs = []
-        for (cross_ch, conv_ch) in encoder_blocks:
-            block = CrossBlock(in_ch, cross_ch, conv_ch, **block_kws)
+        for j, (cross_ch, conv_ch) in enumerate(encoder_blocks):
+            if j == 0 and args.use_sk:
+                block = CrossBlockSequential(
+                    CrossBlock(in_ch, cross_ch, conv_ch, **dict(
+                        cross_kws=dict(
+                            nonlinearity=None, 
+                            use_sk=False),
+                        conv_kws=dict(
+                            use_sk=False)
+                    )),
+                    CrossBlock(conv_ch, cross_ch, conv_ch, **block_kws)
+                )
+            else:
+                block = CrossBlock(in_ch, cross_ch, conv_ch, **block_kws)
             in_ch = conv_ch
             self.enc_blocks.append(block)
             skip_outputs.append(in_ch)
@@ -223,7 +290,7 @@ class UniverSeg(iFSLModule):
 
             self.bottleneck = nn.Sequential(
                 nn.Conv2d(self.fea_dim, self.bottleneck_dim, kernel_size=3, padding=1, bias=False),
-                nn.ReLU(inplace=True),
+                nn.LeakyReLU(inplace=True),
                 nn.Dropout2d(p=self.dropout))
 
         # Decoder

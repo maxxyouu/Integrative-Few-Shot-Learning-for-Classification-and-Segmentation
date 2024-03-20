@@ -79,10 +79,15 @@ if __name__ == '__main__':
     parser.add_argument('--resume', action='store_true', help='Flag to resume a finished run')
     parser.add_argument('--vis', action='store_true', help='Flag to visualize. Use with --eval')
     parser.add_argument('--dice', type=bool, default=False, help='using the dice loss function otherwise using the cross entropy loss')
-
+    
+    # psp module
     parser.add_argument('--use_ppm', type=bool, default=False, help='using pyramid pooling module to encode contexual information')
     parser.add_argument('--bins', type=list, default=[1, 2, 5, 10], help='scales and number of pyramid pooling, use with args.use_ppm')
     parser.add_argument('--dropout', type=float, default=0., help='dropout mainly used with ppm module')
+
+    # selective kernel convolution
+    parser.add_argument('--use_sk', type=bool, default=False, help='use selective kernel operation to replace the vanilla convolution operation')
+    parser.add_argument('--sk_split_input', type=bool, default=False, help='resnext style during convolution or not')
 
     args = parser.parse_args()
     args.nowandb = True
@@ -90,14 +95,22 @@ if __name__ == '__main__':
 
     # automatically switch to dice loss and lower learning rate for universeg model
     if args.method == 'universeg':
+
         # according to the universeg implemenation.
-        args.dice = True
+        args.dice = True    
         args.lr = 1e-4
         args.bsz = 1 # if using 2, must use the groupnorm to work properly
         args.shot = 2
-        args.use_ppm = True
+
+        # toggle the follow attributes to enable different combination of architecture
+        args.use_ppm = False
+        args.use_sk = True
 
         if args.use_ppm:
             args.bins = [1, 2, 5, 10]
             args.dropout = 0.1
+        
+        if args.use_sk:
+            args.sk_split_input = True # turn this on to save the model complexity
+            # TODO: hyperparemter setting for sk module
     main(args)
