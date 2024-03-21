@@ -56,7 +56,7 @@ class SelectiveKernel(nn.Module):
 
     def __init__(self, in_channels, out_channels=None, kernel_size=None, stride=1, dilation=1, groups=1,
                     bias=False, rd_ratio=1./16, rd_channels=None, rd_divisor=8, keep_3x3=True, split_input=True,
-                    act_layer=None, norm_layer=None, aa_layer=None, drop_layer=None):
+                    act_layer=nn.LeakyReLU, norm_layer=None, aa_layer=None, drop_layer=None):
         """ Selective Kernel Convolution Module
 
         As described in Selective Kernel Networks (https://arxiv.org/abs/1903.06586) with some modifications.
@@ -117,7 +117,7 @@ class SelectiveKernel(nn.Module):
             # this is a ResNeXt approach where the the tensor channels are splitted into equal size two tensor and apply
             # selective kernel in each of the path
             x_split = torch.split(x, self.in_channels // self.num_paths, 1)
-            x_paths = [op(x_split[i]) for i, op in enumerate(self.paths)]
+            x_paths = [op(x_split[i]) for i, op in enumerate(self.paths)] # non-linearity should be here
         else:
             # if no split, this is a resnet
             x_paths = [op(x) for op in self.paths]

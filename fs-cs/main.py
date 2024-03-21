@@ -120,5 +120,5 @@ if __name__ == '__main__':
             args.sk_split_input = True # turn this on to save the model complexity
 
         if args.use_sc:
-            pass
+            pass # NOTE: add hyperparameters for sc convolution here.
     main(args)

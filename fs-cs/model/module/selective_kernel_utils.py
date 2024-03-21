@@ -275,18 +275,18 @@ def get_norm_act_layer(norm_layer, act_layer=None):
     #     norm_act_layer = functools.partial(norm_act_layer, **norm_act_kwargs)  # bind/rebind args
     return norm_act_layer
 
-def create_aa(aa_layer, channels, stride=2, enable=True):
-    if not aa_layer or not enable:
-        return nn.Identity()
-    if isinstance(aa_layer, functools.partial):
-        if issubclass(aa_layer.func, nn.AvgPool2d):
-            return aa_layer()
-        else:
-            return aa_layer(channels)
-    elif issubclass(aa_layer, nn.AvgPool2d):
-        return aa_layer(stride)
-    else:
-        return aa_layer(channels=channels, stride=stride)
+# def create_aa(aa_layer, channels, stride=2, enable=True):
+#     if not aa_layer or not enable:
+#         return nn.Identity()
+#     if isinstance(aa_layer, functools.partial):
+#         if issubclass(aa_layer.func, nn.AvgPool2d):
+#             return aa_layer()
+#         else:
+#             return aa_layer(channels)
+#     elif issubclass(aa_layer, nn.AvgPool2d):
+#         return aa_layer(stride)
+#     else:
+#         return aa_layer(channels=channels, stride=stride)
 
 class ConvNormActAa(nn.Module):
     def __init__(
@@ -302,7 +302,7 @@ class ConvNormActAa(nn.Module):
             apply_act=True,
             norm_layer=None, #nn.BatchNorm2d,
             norm_kwargs=None,
-            act_layer=None,
+            act_layer=nn.LeakyReLU,
             act_kwargs=None,
             aa_layer=None,
             drop_layer=None,
@@ -318,13 +318,12 @@ class ConvNormActAa(nn.Module):
 
         # NOTE for backwards compatibility with models that use separate norm and act layer definitions
         assert norm_layer == None
-        norm_act_layer = get_norm_act_layer(norm_layer, act_layer)
         # NOTE for backwards (weight) compatibility, norm layer name remains `.bn`
         if drop_layer:
             norm_kwargs['drop_layer'] = drop_layer
         
-        self.bn = norm_act_layer(out_channels, apply_act=apply_act, act_kwargs=act_kwargs, **norm_kwargs) if  norm_act_layer else None
-        self.aa = create_aa(aa_layer, out_channels, stride=stride, enable=use_aa)
+        self.bn = norm_layer if norm_layer else None
+        self.act_layer = act_layer(inplace=True) if act_layer else None
 
     @property
     def in_channels(self):
@@ -338,6 +337,7 @@ class ConvNormActAa(nn.Module):
         x = self.conv(x)
         if self.bn:
             x = self.bn(x)
-        x = self.aa(x)
+        if self.act_layer:
+            x = self.act_layer(x)
         return x
 

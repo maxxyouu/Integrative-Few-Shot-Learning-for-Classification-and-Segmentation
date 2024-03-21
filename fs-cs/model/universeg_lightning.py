@@ -10,9 +10,10 @@ from einops import rearrange
 from model.base.feature import extract_feat_res
 from model.ifsl import iFSLModule
 from model.module.selective_kernel import SelectiveKernel
+from model.module.scnet import SCBottleneck
 
 #universeg related
-from .universeg.nn import CrossConv2d, CrossSKConv2d
+from .universeg.nn import CrossConv2d, CrossSKConv2d, CrossSCConv2d
 from .universeg.nn import reset_conv2d_parameters
 from .universeg.nn import Vmap, vmap
 from .universeg.validation import (Kwargs, as_2tuple, size2t, validate_arguments,
@@ -49,8 +50,10 @@ class ConvOp(nn.Sequential):
                 nonlinearity: Optional[str] = "LeakyReLU", 
                 init_distribution: Optional[str] = "kaiming_normal", 
                 init_bias: Union[None, float, int] = 0.0,
+                use_sc: bool = False,
                 use_sk: bool = False,
-                sk_split_input=True):
+                sk_split_input: bool =True,
+                last_layer: bool =False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -60,8 +63,17 @@ class ConvOp(nn.Sequential):
         self.init_distribution = init_distribution
         self.init_bias = init_bias
 
-        # for selective kernel option
-        if use_sk:
+        # assert use_sc != use_sk
+        if use_sc:
+            self.conv = SCBottleneck(
+                self.in_channels,
+                self.out_channels,
+                act_layer=nn.LeakyReLU if nonlinearity == 'LeakyReLU' else None,
+                # TODO: might need to specify a padding, double check this.
+                bias=True,
+                last_layer=last_layer
+            )
+        elif use_sk: # for selective kernel option 
             self.conv = SelectiveKernel(
                 self.in_channels,
                 self.out_channels,
@@ -107,6 +119,7 @@ class CrossOp(nn.Module):
                 init_distribution: Optional[str] = "kaiming_normal", 
                 init_bias: Union[None, float, int] = 0.0,
                 use_sk: bool = False,
+                use_sc: bool = False,
                 sk_split_input = True):
         super().__init__()
 
@@ -117,7 +130,15 @@ class CrossOp(nn.Module):
         self.init_distribution = init_distribution
         self.init_bias = init_bias
 
-        if use_sk:
+        # assert use_sc == True and use_sc != use_sk
+        
+        if use_sc:
+            self.cross_conv = CrossSCConv2d(
+                in_channels=as_2tuple(self.in_channels),
+                out_channels=self.out_channels,
+                kernel_size=self.kernel_size,
+            )
+        elif use_sk:
             self.cross_conv = CrossSKConv2d(
                 in_channels=as_2tuple(self.in_channels),
                 out_channels=self.out_channels,
@@ -125,6 +146,8 @@ class CrossOp(nn.Module):
                 sk_split_input = sk_split_input
                 # padding=self.kernel_size // 2,
             )
+            # make sure no more nonlinearity as internally in the CrossSKConv2d there is nonlinearity already
+            assert self.nonlinearity is None
         else:
             self.cross_conv = CrossConv2d(
                 in_channels=as_2tuple(self.in_channels),
@@ -170,6 +193,7 @@ class CrossBlock(nn.Module):
         self.conv_kws = conv_kws
 
         assert 'use_sk' in self.conv_kws and 'use_sk' in self.cross_kws
+        assert 'use_sc' in self.conv_kws and 'use_sc' in self.cross_kws
 
         conv_features = self.conv_features or self.cross_features
         cross_kws = self.cross_kws or {}
@@ -241,14 +265,17 @@ class UniverSeg(iFSLModule):
         decoder_blocks = list(map(as_2tuple, decoder_blocks))
 
         # toggle the selective kernel module in here
+        conv_kws = dict(
+                use_sk=True if args.use_sk else False,
+                use_sc=True if args.use_sc else False,
+                sk_split_input=True if args.sk_split_input else False)
         block_kws = dict(
             cross_kws=dict(
                 nonlinearity=None, 
                 use_sk=True if args.use_sk else False,
+                use_sc=True if args.use_sc else False,
                 sk_split_input=True if args.sk_split_input else False),
-            conv_kws=dict(
-                use_sk=True if args.use_sk else False,
-                sk_split_input=True if args.sk_split_input else False)
+            conv_kws=conv_kws
         )
 
         # in_ch = (1, 2) #NOTE: this is for 1d image slice
@@ -256,19 +283,24 @@ class UniverSeg(iFSLModule):
 
         in_ch = (3, 4) #NOTE: this is for rgb images (input dimension of the query images, input dimension of support images + input dimention of the support mask)
         out_channels = 2 #NOTE: for using logsoftmax + negative log likelihood
-        out_activation = None
 
         # Encoder
         skip_outputs = []
         for j, (cross_ch, conv_ch) in enumerate(encoder_blocks):
             if j == 0 and args.use_sk:
+                # a additional crossblock in the first layer to make sure
+                # there are enough feature maps split the path evenly
+                # otherwise there are 7 paths to split
+                # TODO: see if necessary to use the approach used in scnet
                 block = CrossBlockSequential(
                     CrossBlock(in_ch, cross_ch, conv_ch, **dict(
                         cross_kws=dict(
-                            nonlinearity=None, 
-                            use_sk=False),
+                            # nonlinearity=None, 
+                            use_sk=False,
+                            use_sc=False),
                         conv_kws=dict(
-                            use_sk=False)
+                            use_sk=False,
+                            use_sc=False)
                     )),
                     CrossBlock(conv_ch, cross_ch, conv_ch, **block_kws)
                 )
@@ -300,8 +332,9 @@ class UniverSeg(iFSLModule):
             in_ch = conv_ch
             self.dec_blocks.append(block)
 
+        out_activation = None
         self.out_conv = ConvOp(
-            in_ch, out_channels, kernel_size=1, nonlinearity=out_activation,
+            in_ch, out_channels, kernel_size=1, **conv_kws
         )
 
     def forward(self, batch):
@@ -364,7 +397,7 @@ class UniverSeg(iFSLModule):
         target = rearrange(target, "B 1 C H W -> B C H W")
         logits = self.out_conv(target)
         
-        # should be for dimension of foreground and background
+        # activation of the last layer and compute loss should be for dimension of foreground and background
         shared_masks = torch.log_softmax(logits, dim=1).unsqueeze(1) # B 1-way C H W
 
         # NOTE: for out_channels = 1: we have to use log sigmoid + bceCE and not log softmax + negative log likelihood 
