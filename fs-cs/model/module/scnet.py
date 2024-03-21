@@ -80,11 +80,11 @@ class SCBottleneck(nn.Module):
         #     group_width * 2, planes * 4, kernel_size=1, bias=bias)
         # self.bn3 = norm_layer(planes*4)
 
+        self.last_layer = last_layer
         self.act = act_layer(inplace=True)
         self.downsample = downsample
         self.dilation = dilation
         self.stride = stride
-        self.last_layer = last_layer
 
     def forward(self, x):
         # residual = x
@@ -98,6 +98,7 @@ class SCBottleneck(nn.Module):
         if self.bn1_b:
             out_b = self.bn1_b(out_b)
         
+        # keep the nonlinear activation here even for the last layer
         out_a = self.act(out_a)
         out_b = self.act(out_b)
 
@@ -112,7 +113,7 @@ class SCBottleneck(nn.Module):
         # if self.avd:
         #     out_a = self.avd_layer(out_a)
         #     out_b = self.avd_layer(out_b)
-        out = torch.cat([out_a, out_b])
+        out = torch.cat([out_a, out_b], dim=1)
 
         # out = self.conv3(out, dim=1)
         # out = self.bn3(out)

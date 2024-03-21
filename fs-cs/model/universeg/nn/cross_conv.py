@@ -397,7 +397,7 @@ class CrossSCConv2d(SCBottleneck):
         # here performs the sk cross convolution.
         batched_output = super().forward(batched_xy)
 
-        output = E.rearrange(
+        output =    E.rearrange(
             batched_output, "(B Sx Sy) Co H W -> B Sx Sy Co H W", B=B, Sx=Sx, Sy=Sy
         )
         return output

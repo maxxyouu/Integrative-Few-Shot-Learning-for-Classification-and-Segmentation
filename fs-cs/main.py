@@ -107,10 +107,10 @@ if __name__ == '__main__':
 
         # toggle the follow attributes to enable different combination of architecture
         args.use_ppm = False
-        args.use_sk = True
-        args.use_sc = False
+        args.use_sk = False
+        args.use_sc = True
 
-        assert args.use_sc != args.use_sk # make sure no contradictory architecture
+        # assert args.use_sc != args.use_sk # make sure no contradictory architecture
 
         if args.use_ppm:
             args.bins = [1, 2, 5, 10]

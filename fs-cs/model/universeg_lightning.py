@@ -69,7 +69,6 @@ class ConvOp(nn.Sequential):
                 self.in_channels,
                 self.out_channels,
                 act_layer=nn.LeakyReLU if nonlinearity == 'LeakyReLU' else None,
-                # TODO: might need to specify a padding, double check this.
                 bias=True,
                 last_layer=last_layer
             )
@@ -78,7 +77,6 @@ class ConvOp(nn.Sequential):
                 self.in_channels,
                 self.out_channels,
                 act_layer=nn.LeakyReLU if nonlinearity == 'LeakyReLU' else None,
-                # TODO: might need to specify a padding, double check this.
                 bias=True,
                 split_input=sk_split_input
             #padding_mode by default is "zeros"
@@ -334,7 +332,7 @@ class UniverSeg(iFSLModule):
 
         out_activation = None
         self.out_conv = ConvOp(
-            in_ch, out_channels, kernel_size=1, **conv_kws
+            in_ch, out_channels, kernel_size=1, last_layer=True, **conv_kws
         )
 
     def forward(self, batch):
