@@ -89,6 +89,9 @@ if __name__ == '__main__':
     parser.add_argument('--use_sk', type=bool, default=False, help='use selective kernel operation to replace the vanilla convolution operation')
     parser.add_argument('--sk_split_input', type=bool, default=False, help='resnext style during convolution or not')
 
+    # self-calibration convolution
+    parser.add_argument('--use_sc', type=bool, default=False, help='use self calibration operation to replace the vanilla convolution operation')
+
     args = parser.parse_args()
     args.nowandb = True
     args.weak = False
@@ -105,6 +108,9 @@ if __name__ == '__main__':
         # toggle the follow attributes to enable different combination of architecture
         args.use_ppm = False
         args.use_sk = True
+        args.use_sc = False
+
+        assert args.use_sc != args.use_sk # make sure no contradictory architecture
 
         if args.use_ppm:
             args.bins = [1, 2, 5, 10]
@@ -112,5 +118,7 @@ if __name__ == '__main__':
         
         if args.use_sk:
             args.sk_split_input = True # turn this on to save the model complexity
-            # TODO: hyperparemter setting for sk module
+
+        if args.use_sc:
+            pass
     main(args)
