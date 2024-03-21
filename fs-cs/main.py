@@ -92,6 +92,10 @@ if __name__ == '__main__':
     # self-calibration convolution
     parser.add_argument('--use_sc', type=bool, default=False, help='use self calibration operation to replace the vanilla convolution operation')
 
+    # integration of sk on scnet
+    parser.add_argument('--sk_on_sc_hybrid', type=bool, default=False, help='replace the vanilla k1 convolution with the selective kernel convolution')
+    parser.add_argument('--sc_on_sk_hybrid', type=bool, default=False, help='do the self-calibration operation in one of the splitted path in sknet')
+
     args = parser.parse_args()
     args.nowandb = True
     args.weak = False
@@ -108,9 +112,17 @@ if __name__ == '__main__':
         # toggle the follow attributes to enable different combination of architecture
         args.use_ppm = False
         args.use_sk = False
-        args.use_sc = True
+        args.use_sc = False
 
-        # assert args.use_sc != args.use_sk # make sure no contradictory architecture
+        # turn of other variants' flag if hybrid is used.
+        args.sk_on_sc_hybrid = True
+        if args.sk_on_sc_hybrid:
+            args.use_sk = False
+            args.use_sc = True 
+        
+        # if args.sc_on_sk_hybrid:
+        #     args.use_sk = True
+        #     args.use_sc = False
 
         if args.use_ppm:
             args.bins = [1, 2, 5, 10]

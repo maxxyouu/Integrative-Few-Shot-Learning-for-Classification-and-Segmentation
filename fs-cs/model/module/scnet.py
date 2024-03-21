@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .selective_kernel import SelectiveKernel
+
 class SCNet(nn.Module):
     """this is the self calibration module for spatial neuron activation"""
     def __init__(self, inplanes, planes, stride, padding, dilation, groups, pooling_r, norm_layer, bias):
@@ -45,7 +47,7 @@ class SCBottleneck(nn.Module):
     def __init__(self, inplanes, planes, stride=1, downsample=None,
                     cardinality=1, bottleneck_width=32,
                     avd=False, dilation=1, is_first=False,
-                    norm_layer=None, act_layer=nn.LeakyReLU, bias=False, last_layer=False):
+                    norm_layer=None, act_layer=nn.LeakyReLU, bias=False, last_layer=False, hybrid=False):
         """note for small model bias should be large but for large model bias does not matter
         
         k1 and scnet with default kernel size of 3 
@@ -63,13 +65,17 @@ class SCBottleneck(nn.Module):
             self.avd_layer = nn.AvgPool2d(3, stride, padding=1)
             stride = 1
 
-        self.k1 = nn.Sequential(
-                    nn.Conv2d(
-                        group_width, group_width, kernel_size=3, stride=stride,
-                        padding=dilation, dilation=dilation,
-                        groups=cardinality, bias=bias),
-                    # norm_layer(group_width), # NOTE: check if this is exists if it is None
-                    )
+        if hybrid:
+            self.k1 = SelectiveKernel(group_width, group_width, kernel_size=3, stride=stride,
+                                    groups=cardinality, bias=bias, split_input=False)
+        else:
+            self.k1 = nn.Sequential(
+                        nn.Conv2d(
+                            group_width, group_width, kernel_size=3, stride=stride,
+                            padding=dilation, dilation=dilation,
+                            groups=cardinality, bias=bias),
+                        # norm_layer(group_width), # NOTE: check if this is exists if it is None
+                        )
 
         self.scconv = SCNet(
             group_width, group_width, stride=stride,

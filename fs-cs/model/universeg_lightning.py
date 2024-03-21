@@ -53,7 +53,8 @@ class ConvOp(nn.Sequential):
                 use_sc: bool = False,
                 use_sk: bool = False,
                 sk_split_input: bool =True,
-                last_layer: bool =False):
+                last_layer: bool =False,
+                sk_on_sc_hybrid:bool=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -70,7 +71,8 @@ class ConvOp(nn.Sequential):
                 self.out_channels,
                 act_layer=nn.LeakyReLU if nonlinearity == 'LeakyReLU' else None,
                 bias=True,
-                last_layer=last_layer
+                last_layer=last_layer,
+                hybrid=sk_on_sc_hybrid
             )
         elif use_sk: # for selective kernel option 
             self.conv = SelectiveKernel(
@@ -118,7 +120,8 @@ class CrossOp(nn.Module):
                 init_bias: Union[None, float, int] = 0.0,
                 use_sk: bool = False,
                 use_sc: bool = False,
-                sk_split_input = True):
+                sk_split_input:bool = True,
+                sk_on_sc_hybrid:bool=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -135,6 +138,7 @@ class CrossOp(nn.Module):
                 in_channels=as_2tuple(self.in_channels),
                 out_channels=self.out_channels,
                 kernel_size=self.kernel_size,
+                sk_on_sc_hybrid=sk_on_sc_hybrid
             )
         elif use_sk:
             self.cross_conv = CrossSKConv2d(
@@ -267,13 +271,17 @@ class UniverSeg(iFSLModule):
         conv_kws = dict(
                 use_sk=True if args.use_sk else False,
                 use_sc=True if args.use_sc else False,
-                sk_split_input=True if args.sk_split_input else False)
+                sk_split_input=True if args.sk_split_input else False,
+                sk_on_sc_hybrid=True if args.sk_on_sc_hybrid else False
+                )
         block_kws = dict(
             cross_kws=dict(
                 nonlinearity=None,
                 use_sk=True if args.use_sk else False,
                 use_sc=True if args.use_sc else False,
-                sk_split_input=True if args.sk_split_input else False),
+                sk_split_input=True if args.sk_split_input else False,
+                sk_on_sc_hybrid=True if args.sk_on_sc_hybrid else False
+                ),
             conv_kws=conv_kws
         )
 
