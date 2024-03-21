@@ -364,7 +364,8 @@ class CrossSCConv2d(SCBottleneck):
             stride=stride,
             dilation=dilation,
             cardinality=groups,
-            bias=bias
+            bias=bias,
+            act_layer=nn.LeakyReLU # NOTE: if we don't want nonlinearity, remove this.
         )
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:

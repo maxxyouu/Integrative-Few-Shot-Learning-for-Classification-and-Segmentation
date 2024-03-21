@@ -80,6 +80,9 @@ class SCBottleneck(nn.Module):
         #     group_width * 2, planes * 4, kernel_size=1, bias=bias)
         # self.bn3 = norm_layer(planes*4)
 
+        # we want the sc convolution to be recifity
+        assert act_layer is not None
+
         self.last_layer = last_layer
         self.act = act_layer(inplace=True)
         self.downsample = downsample
@@ -105,7 +108,7 @@ class SCBottleneck(nn.Module):
         out_a = self.k1(out_a)
         out_b = self.scconv(out_b)
 
-        # NOTE: to make sure that the last layer does not have nonlinear activation
+        # NOTE: to make sure that the last layer does not have nonlinear activation after sc convolution
         if not self.last_layer:
             out_a = self.act(out_a)
             out_b = self.act(out_b)

@@ -145,6 +145,7 @@ class CrossOp(nn.Module):
                 # padding=self.kernel_size // 2,
             )
             # make sure no more nonlinearity as internally in the CrossSKConv2d there is nonlinearity already
+            # so that later after the forward pass, we do not want the interaction to be rectify again
             assert self.nonlinearity is None
         else:
             self.cross_conv = CrossConv2d(
@@ -269,7 +270,7 @@ class UniverSeg(iFSLModule):
                 sk_split_input=True if args.sk_split_input else False)
         block_kws = dict(
             cross_kws=dict(
-                nonlinearity=None, 
+                nonlinearity=None,
                 use_sk=True if args.use_sk else False,
                 use_sc=True if args.use_sc else False,
                 sk_split_input=True if args.sk_split_input else False),
