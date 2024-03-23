@@ -107,7 +107,7 @@ if __name__ == '__main__':
         args.dice = True    
         args.lr = 1e-4
         args.bsz = 1 # if using 2, must use the groupnorm to work properly
-        args.shot = 2
+        args.shot = 1
 
         # toggle the follow attributes to enable different combination of architecture
         args.use_ppm = False
