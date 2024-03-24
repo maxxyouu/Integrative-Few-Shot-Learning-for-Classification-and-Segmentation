@@ -37,6 +37,65 @@ class SCNet(nn.Module):
         out = self.k4(out) # k4
 
         return out
+    
+class ContextualSCNet(nn.Module):
+    """the self-calibrated activation is invoked by using contexual spatial information instead of a fixed pooling r"""
+    def __init__(self, inplanes, planes, stride, padding, dilation, groups, pooling_r, norm_layer, bias, in_dim, reduction_dim, bins):
+        """inplanes: number of input channels; planes: number of output channels"""
+        super(ContextualSCNet, self).__init__()
+        self.features = []
+        self.inplanes = inplanes
+        # take into account of different average pooling scale for multi-scale convolution.
+        for bin in bins:
+            self.features.append(nn.Sequential(
+                nn.AdaptiveAvgPool2d(bin),
+                nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
+                nn.LeakyReLU(inplace=True)))
+        self.features = nn.ModuleList(self.features)
+
+        # to summarize the channel information after ppm convolution
+        self.bottleneck = nn.Sequential(
+            # nn.Conv2d(in_dim, in_dim, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_dim, in_dim, kernel_size=1, padding=0, bias=False),
+            nn.LeakyReLU(inplace=True),
+            # nn.Dropout2d(p=0.1)
+            )
+
+        # scnet modules
+        self.k3 = nn.Sequential(
+                    nn.Conv2d(inplanes, planes, kernel_size=3, stride=1,
+                                padding=padding, dilation=dilation,
+                                groups=groups, bias=bias),
+                    # norm_layer(planes),
+                    )
+        self.k4 = nn.Sequential(
+                    nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride,
+                                padding=padding, dilation=dilation,
+                                groups=groups, bias=bias),
+                    # norm_layer(planes),
+                    )
+    
+    def forward(self, x):
+
+        # modified ppm 
+        x_size = x.size()
+        out = []
+        for f in self.features:
+            out.append(F.interpolate(f(x), x_size[2:], mode='bilinear', align_corners=True))
+        # out.append(self.features[-1](x)) # include the channel-squeezed identity
+        ppm_out = torch.cat(out, 1)
+        assert ppm_out.shape[1] == self.inplanes
+
+        # summarize the channel information
+        ppm_out = self.bottleneck(ppm_out)
+
+        # scnet
+        identity = x
+        out = torch.sigmoid(torch.add(identity, F.interpolate(ppm_out, identity.size()[2:]))) # sigmoid(identity + k2)
+        out = torch.mul(self.k3(x), out) # k3 * sigmoid(identity + k2)
+        out = self.k4(out) # k4
+
+        return out
 
 class SCBottleneck(nn.Module):
     """SCNet SCBottleneck
@@ -47,7 +106,9 @@ class SCBottleneck(nn.Module):
     def __init__(self, inplanes, planes, stride=1, downsample=None,
                     cardinality=1, bottleneck_width=32,
                     avd=False, dilation=1, is_first=False,
-                    norm_layer=None, act_layer=nn.LeakyReLU, bias=False, last_layer=False, hybrid=False):
+                    norm_layer=None, act_layer=nn.LeakyReLU, 
+                    bias=False, last_layer=False, 
+                    hybrid=False, contexualSCNet=False, in_dim=-1, bins=[]):
         """note for small model bias should be large but for large model bias does not matter
         
         k1 and scnet with default kernel size of 3 
@@ -77,10 +138,21 @@ class SCBottleneck(nn.Module):
                         # norm_layer(group_width), # NOTE: check if this is exists if it is None
                         )
 
-        self.scconv = SCNet(
-            group_width, group_width, stride=stride,
-            padding=dilation, dilation=dilation,
-            groups=cardinality, pooling_r=self.pooling_r, norm_layer=norm_layer, bias=bias)
+        if not contexualSCNet:
+            self.scconv = SCNet(
+                group_width, group_width, stride=stride,
+                padding=dilation, dilation=dilation,
+                groups=cardinality, pooling_r=self.pooling_r, norm_layer=norm_layer, bias=bias)
+        else:
+            # TODO: add in_dim, out_dim and bins parameters
+            self.scconv = ContextualSCNet(
+                group_width, group_width, stride=stride,
+                padding=dilation, dilation=dilation,
+                groups=cardinality, pooling_r=self.pooling_r, 
+                norm_layer=norm_layer, bias=bias,
+                in_dim=in_dim, 
+                reduction_dim=int(in_dim/(len(bins))), # +1 to take into account the non-averaged pooling feature
+                bins=bins)
 
         # self.conv3 = nn.Conv2d(
         #     group_width * 2, planes * 4, kernel_size=1, bias=bias)

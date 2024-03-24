@@ -55,6 +55,7 @@ def main(args):
 
 
 if __name__ == '__main__':
+    torch.manual_seed(100)
 
     # Arguments parsing
     # from the labL E:\\Integrative-Few-Shot-Learning-for-Classification-and-Segmentation\\datasets\\pascal\VOCdevkit
@@ -96,6 +97,9 @@ if __name__ == '__main__':
     parser.add_argument('--sk_on_sc_hybrid', type=bool, default=False, help='replace the vanilla k1 convolution with the selective kernel convolution')
     parser.add_argument('--sc_on_sk_hybrid', type=bool, default=False, help='do the self-calibration operation in one of the splitted path in sknet')
 
+    # contexual average pooling version of self-calibration network (psp-scnet)
+    parser.add_argument('--use_contexual_sc', type=bool, default=False, help='integration of pspnet into the average pooling before self-calibration')
+
     args = parser.parse_args()
     args.nowandb = True
     args.weak = False
@@ -112,7 +116,18 @@ if __name__ == '__main__':
         # toggle the follow attributes to enable different combination of architecture
         args.use_ppm = False
         args.use_sk = False
-        args.use_sc = False
+        args.use_sc = True
+
+        args.use_contexual_sc = True
+        if args.use_contexual_sc:
+            args.bins = [1, 2, 5, 10]
+            # default dropout = 0.1 or none with experiment
+                #NOTE: none by default
+            # does 1x1 convolution better for summarize the information?
+                # change the bottleneck to 3x3 convolution if 1x1 is not good enough
+            # when use sk_on_sc_hybrid and contexual sc
+                # with 3x3 bottleneck, it should has 1.2M params
+                # with 1x1 bottleneck, it should has <1M = 968k params
 
         # turn of other variants' flag if hybrid is used.
         args.sk_on_sc_hybrid = True

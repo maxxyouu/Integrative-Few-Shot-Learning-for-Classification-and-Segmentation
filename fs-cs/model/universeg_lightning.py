@@ -54,7 +54,10 @@ class ConvOp(nn.Sequential):
                 use_sk: bool = False,
                 sk_split_input: bool =True,
                 last_layer: bool =False,
-                sk_on_sc_hybrid:bool=False):
+                sk_on_sc_hybrid:bool=False,
+                use_contexual_sc:bool=False,
+                in_dim=-1,
+                bins=[]):
         super().__init__()
 
         self.in_channels = in_channels
@@ -65,14 +68,17 @@ class ConvOp(nn.Sequential):
         self.init_bias = init_bias
 
         # assert use_sc != use_sk
-        if use_sc:
+        if use_sc or use_contexual_sc:
             self.conv = SCBottleneck(
                 self.in_channels,
                 self.out_channels,
                 act_layer=nn.LeakyReLU if nonlinearity == 'LeakyReLU' else None,
                 bias=True,
                 last_layer=last_layer,
-                hybrid=sk_on_sc_hybrid
+                hybrid=sk_on_sc_hybrid,
+                contexualSCNet=use_contexual_sc,
+                in_dim=in_dim,
+                bins=bins
             )
         elif use_sk: # for selective kernel option 
             self.conv = SelectiveKernel(
@@ -93,7 +99,7 @@ class ConvOp(nn.Sequential):
                 bias=True,
             )
 
-            if self.nonlinearity is not None:
+            if self.nonlinearity is not None and not last_layer:
                 self.nonlin = get_nonlinearity(self.nonlinearity)
 
         reset_conv2d_parameters(
@@ -121,7 +127,9 @@ class CrossOp(nn.Module):
                 use_sk: bool = False,
                 use_sc: bool = False,
                 sk_split_input:bool = True,
-                sk_on_sc_hybrid:bool=False):
+                sk_on_sc_hybrid:bool=False,
+                use_contexual_sc:bool=False,
+                in_dim=-1, bins=[]):
         super().__init__()
 
         self.in_channels = in_channels
@@ -133,12 +141,14 @@ class CrossOp(nn.Module):
 
         # assert use_sc == True and use_sc != use_sk
         
-        if use_sc:
+        if use_sc or use_contexual_sc:
             self.cross_conv = CrossSCConv2d(
                 in_channels=as_2tuple(self.in_channels),
                 out_channels=self.out_channels,
                 kernel_size=self.kernel_size,
-                sk_on_sc_hybrid=sk_on_sc_hybrid
+                sk_on_sc_hybrid=sk_on_sc_hybrid,
+                contexualSCNet=use_contexual_sc,
+                in_dim=in_dim, bins=bins
             )
         elif use_sk:
             self.cross_conv = CrossSKConv2d(
@@ -272,16 +282,28 @@ class UniverSeg(iFSLModule):
                 use_sk=True if args.use_sk else False,
                 use_sc=True if args.use_sc else False,
                 sk_split_input=True if args.sk_split_input else False,
-                sk_on_sc_hybrid=True if args.sk_on_sc_hybrid else False
+                sk_on_sc_hybrid=True if args.sk_on_sc_hybrid else False,
+                use_contexual_sc = True if args.use_contexual_sc else False
                 )
+        cross_kws=dict(
+            nonlinearity=None,
+            use_sk=True if args.use_sk else False,
+            use_sc=True if args.use_sc else False,
+            sk_split_input=True if args.sk_split_input else False,
+            sk_on_sc_hybrid=True if args.sk_on_sc_hybrid else False,
+            use_contexual_sc = True if args.use_contexual_sc else False
+            )
+        
+        # include relevant information for contexual sc module
+        if args.use_contexual_sc:
+            conv_kws['in_dim'] = self.encoder_blocks[-1] // 2
+            conv_kws['bins'] = args.bins
+
+            cross_kws['in_dim'] = self.encoder_blocks[-1] // 2
+            cross_kws['bins'] = args.bins
+
         block_kws = dict(
-            cross_kws=dict(
-                nonlinearity=None,
-                use_sk=True if args.use_sk else False,
-                use_sc=True if args.use_sc else False,
-                sk_split_input=True if args.sk_split_input else False,
-                sk_on_sc_hybrid=True if args.sk_on_sc_hybrid else False
-                ),
+            cross_kws=cross_kws,
             conv_kws=conv_kws
         )
 
@@ -340,9 +362,14 @@ class UniverSeg(iFSLModule):
             self.dec_blocks.append(block)
 
         out_activation = None
-        self.out_conv = ConvOp(
-            in_ch, out_channels, kernel_size=1, last_layer=True, **conv_kws
-        )
+        if args.use_contexual_sc:
+            self.out_conv = ConvOp(
+                in_ch, out_channels, kernel_size=1, last_layer=True
+            )
+        else:
+            self.out_conv = ConvOp(
+                in_ch, out_channels, kernel_size=1, last_layer=True, **conv_kws
+            )
 
     def forward(self, batch):
         '''

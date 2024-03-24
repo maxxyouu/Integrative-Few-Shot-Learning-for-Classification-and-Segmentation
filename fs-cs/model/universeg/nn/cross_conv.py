@@ -351,7 +351,10 @@ class CrossSCConv2d(SCBottleneck):
         padding_mode: str = "zeros",
         device=None,
         dtype=None,
-        sk_on_sc_hybrid=False
+        sk_on_sc_hybrid=False,
+        contexualSCNet=False,
+        in_dim=-1, 
+        bins=[]
     ) -> None:
 
         if isinstance(in_channels, (list, tuple)):
@@ -367,6 +370,9 @@ class CrossSCConv2d(SCBottleneck):
             cardinality=groups,
             bias=bias,
             hybrid=sk_on_sc_hybrid,
+            contexualSCNet=contexualSCNet,
+            in_dim=in_dim,
+            bins=bins,
             act_layer=nn.LeakyReLU # NOTE: if we don't want nonlinearity, remove this.
         )
 
